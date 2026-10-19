@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "M365 Copilot Extender",
+  "version": "0.1.0",
+  "description": "Keep your preferred Copilot model selected and see server-reported usage allowances.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "M365 Copilot Extender",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://m365.cloud.microsoft/*"],
+      "js": ["core.js", "page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://m365.cloud.microsoft/*"],
+      "js": ["core.js", "panel.js", "content.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ]
+}

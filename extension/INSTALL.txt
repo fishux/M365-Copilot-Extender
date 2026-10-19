@@ -1,0 +1,26 @@
+M365 Copilot Extender v0.1.0
+
+1. Extract this ZIP to a permanent folder on your Windows computer.
+2. In Google Chrome, open chrome://extensions and enable Developer mode.
+3. Click Load unpacked and choose the extracted folder containing manifest.json.
+4. Pin M365 Copilot Extender from Chrome's Extensions menu.
+5. Open or reload https://m365.cloud.microsoft after installation.
+
+Use the dropdown in the toolbar popup or the floating Copilot panel.
+GPT-6.1 Sol is the initial default. Your selection persists in this Chrome
+profile across tabs and browser restarts. The toolbar switch hides or restores
+the floating panel without turning off the model override.
+
+Send a chat message to obtain usage allowances from Copilot's response.
+Numbers are remaining messages, not estimated totals. Missing values are unknown.
+Only models with documented or observed model-specific budgets show counters.
+The popup shows information from the active Copilot tab.
+
+The extension requests the selected tone; Microsoft controls final routing and
+account entitlements. It preserves the existing paid/included connection scenario.
+No automatic model fallback or quota-limit bypass is implemented.
+
+This MVP has been tested with protocol and browser fixtures. Live validation
+in your own signed-in Copilot account is still required.
+
+Source and technical notes: https://github.com/fishux/M365-Copilot-Extender
