@@ -1,0 +1,18 @@
+# Local research checkouts and generated artifacts
+/work/
+/outputs/
+
+# Local tooling and dependencies
+.DS_Store
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+
+# Sensitive browser/session captures
+*.har
+captures/
+profiles/
+.profile*/
