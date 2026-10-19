@@ -93,3 +93,29 @@ test('cross-tab changes arriving during startup are not overwritten by a stale i
   resolve({ selectedTone: 'Magic', inPageEnabled: true }); await settle();
   assert.equal(env.panels[0].state.tone, 'Gpt_5_5_Reasoning'); assert.equal(env.hosts[0].style.display, 'none');
 });
+test('conversation capacity and expiry flow through the hook without persisting per-chat data', async () => {
+  const env = environment(); env.addContent(); await settle();
+  const socket = new env.main.WebSocket(endpoint); socket.send(chat()); await settle();
+  socket.receive(JSON.stringify({ type: 2, item: {
+    conversationExpiryTime: '2026-11-18T22:30:00+10:00',
+    throttling: { numUserMessagesInConversation: 540, maxNumUserMessagesInConversation: 600 }
+  } }) + '\x1e'); await settle();
+  assert.deepEqual(env.panels[0].state.observed.conversation, { used: 540, limit: 600 });
+  assert.equal(env.panels[0].state.observed.expiresAt, '2026-11-18T12:30:00.000Z');
+  assert.deepEqual(env.store.data, {});
+  socket.receive('{"type":1,"target":"update","arguments":[{"messages":[]}]}\x1e'); await settle();
+  assert.equal(env.panels[0].state.observed.conversation.used, 540);
+  socket.receive('{"type":2,"item":{"result":{"value":"Success"}}}\x1e'); await settle();
+  assert.equal(env.panels[0].state.observed.conversation, undefined);
+  assert.equal(env.panels[0].state.observed.expiresAt, undefined);
+});
+test('a new socket clears prior conversation data and ignores older expiry updates', async () => {
+  const env = environment(); env.addContent(); await settle();
+  const first = new env.main.WebSocket(endpoint); first.send(chat()); await settle();
+  const frame = JSON.stringify({ type: 2, item: { conversationExpiryTime: '2026-11-18T12:00:00Z', throttling: { numUserMessagesInConversation: 600, maxNumUserMessagesInConversation: 600 } } }) + '\x1e';
+  first.receive(frame); await settle();
+  const second = new env.main.WebSocket(endpoint); second.send(chat()); await settle();
+  first.receive(frame); await settle();
+  assert.equal(env.panels[0].state.observed.conversation, undefined);
+  assert.equal(env.panels[0].state.observed.expiresAt, undefined);
+});

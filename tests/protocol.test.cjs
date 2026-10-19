@@ -58,3 +58,38 @@ test('final missing quota clears old readings; streaming-only absence does not',
   assert.deepEqual(clone(core.readMetadata({ type: 2, item: { result: { value: 'Success' } } })), [{ metering: {}, result: 'Success', final: true }]);
   assert.deepEqual(clone(core.readMetadata({ type: 1, target: 'update', arguments: [{ throttling: {} }] })), []);
 });
+test('capacity meter uses server limits, handles zero, and clamps over-limit readings', () => {
+  const empty = core.conversationView({ used: 0, limit: 800 });
+  assert.equal(empty.capacity, '0 / 800 messages'); assert.equal(empty.percent, 0);
+  assert.equal(empty.nearLimit, false);
+  const almost = core.conversationView({ used: 720, limit: 800 });
+  assert.equal(almost.nearLimit, true); assert.equal(almost.percent, 90);
+  const full = core.conversationView({ used: 900, limit: 800 });
+  assert.equal(full.percent, 100); assert.match(full.capacityTitle, /^0 messages remaining/);
+  const zeroLimit = core.conversationView({ used: 0, limit: 0 });
+  assert.equal(zeroLimit.percent, null); assert.equal(zeroLimit.capacity, '0 / 0 messages');
+  for (const value of [undefined, { used: -1, limit: 600 }, { used: 4, limit: '600' }]) {
+    assert.equal(core.conversationView(value).capacity, 'Awaiting reply');
+    assert.equal(core.conversationView(value).percent, null);
+  }
+});
+test('expiry parsing requires an explicit timezone and rejects malformed calendar dates', () => {
+  assert.equal(core.parseExpiry('2026-11-18T12:30:00.1234567Z'), '2026-11-18T12:30:00.123Z');
+  assert.equal(core.parseExpiry('2026-11-18T22:30:00+10:00'), '2026-11-18T12:30:00.000Z');
+  for (const value of [null, 123456, '', 'tomorrow', '2026-11-18', '2026-11-18T12:30:00', '2026-02-30T00:00:00Z', '<script>alert(1)</script>']) assert.equal(core.parseExpiry(value), null);
+});
+test('expiry labels handle short intervals, day ranges, passed timestamps and absence', () => {
+  const now = Date.parse('2026-10-19T00:00:00Z');
+  assert.match(core.conversationView(null, '2026-10-19T00:10:00Z', now).expiryText, /<1h$/);
+  assert.match(core.conversationView(null, '2026-10-20T00:00:00Z', now).expiryText, /24h$/);
+  assert.match(core.conversationView(null, '2026-11-18T00:00:00Z', now).expiryText, /30d$/);
+  assert.match(core.conversationView(null, '2026-10-18T00:00:00Z', now).expiryText, /Passed$/);
+  assert.equal(core.conversationView(null, null, now).expiryText, 'Not reported');
+  assert.match(core.conversationView(null, '2026-11-18T00:00:00Z', now).expiryTitle, /not a guaranteed data deletion date/);
+});
+test('final and streaming metadata carry only normalized server expiry timestamps', () => {
+  const item = { conversationExpiryTime: '2026-11-18T22:30:00+10:00' };
+  assert.equal(core.readMetadata({ type: 2, item })[0].expiresAt, '2026-11-18T12:30:00.000Z');
+  assert.equal(core.readMetadata({ type: 1, target: 'update', arguments: [item] })[0].expiresAt, '2026-11-18T12:30:00.000Z');
+  assert.equal(core.readMetadata({ type: 2, item: { conversationExpiryTime: 'invalid' } })[0].expiresAt, null);
+});

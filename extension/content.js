@@ -79,6 +79,9 @@
       if (core.allowedResults.includes(message.result)) observed.result = message.result;
       if (core.allowedOrigins.includes(message.origin)) observed.origin = message.origin;
       if (core.count(message.conversation?.used) !== null && core.count(message.conversation?.limit) !== null) observed.conversation = { used: message.conversation.used, limit: message.conversation.limit };
+      else if (message.final) delete observed.conversation;
+      if ("expiresAt" in message) observed.expiresAt = core.parseExpiry(message.expiresAt);
+      else if (message.final) delete observed.expiresAt;
     } else { return; }
     render();
   });

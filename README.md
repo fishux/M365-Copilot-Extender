@@ -4,7 +4,7 @@ A lightweight Chrome Manifest V3 extension for persistent model selection in [Mi
 
 Choose a model once using the Chrome toolbar popup or the floating Copilot panel. Your choice applies to outgoing chat requests across Copilot tabs and survives browser restarts. GPT-6.1 Sol is the initial default.
 
-The popup includes a **Show panel on Copilot** switch. Hiding the panel leaves the override active. Both surfaces support light and dark appearance, keyboard navigation, and expandable connection details.
+The popup includes a **Show panel on Copilot** switch. Hiding the panel leaves the override active. Both surfaces support system light/dark appearance, keyboard navigation, and always-visible connection details.
 
 ## Install on Windows
 
@@ -41,7 +41,16 @@ Counters show **remaining messages** reported by Copilot, refreshed after a resp
 - Zero remains visible. `OutOfCredits` is surfaced even if the refusal appears only in the final result. There is no guessed reset countdown or automatic fallback.
 - Readings are kept **in memory in each tab**. The popup reads the active Copilot tab; opening it on another website still lets you change preferences, but shows no connection data. Send a message in a new or reloaded Copilot tab to obtain its readings. Old readings are marked **Last known** after five minutes; they refresh only with a new response.
 
-Connection details show the observed scenario, the last requested model, result code, known content origin, and conversation message count when available. Conversation counts are separate from model budgets.
+Connection details show the observed scenario, the last requested model, result code, and known content origin.
+
+## Conversation capacity and expiry
+
+Both interfaces include a compact conversation section below model usage:
+
+- **Capacity:** the server's used/maximum message counts and a slim meter. It highlights at 90% capacity. The maximum is read from Copilot, never assumed to be 600, and is separate from model allowances. Hover the count for remaining conversation messages.
+- **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
+
+These are readings from the last observed reply in this tab, not a live query of whichever history item is open. Before a response, missing capacity shows **Awaiting reply** and missing or invalid expiry shows **Not reported**. Final replies with missing fields clear old values. New socket connections also clear the previous readings. No per-conversation data is saved to disk. Countdown labels refresh locally without Microsoft requests.
 
 ## Privacy and permissions
 
@@ -60,7 +69,7 @@ npm run package
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.1.zip` with `manifest.json` in the ZIP root.
+For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.4.zip` with `manifest.json` in the ZIP root.
 
 Automated coverage includes multi-record framing, all six models, native socket behavior, settings-load races, cross-tab preference and visibility propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, and metadata privacy. The browser fixture checks both selectors, panel visibility, usage states, collapse behavior, and active-tab popup readings.
 
