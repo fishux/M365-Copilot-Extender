@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "M365 Copilot Extender",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Keep your preferred Copilot model selected and see server-reported usage allowances.",
   "minimum_chrome_version": "111",
   "permissions": [
@@ -27,7 +27,6 @@
         "https://m365.cloud.microsoft/*"
       ],
       "js": [
-        "core.js",
         "page-hook.js"
       ],
       "run_at": "document_start",
@@ -38,7 +37,6 @@
         "https://m365.cloud.microsoft/*"
       ],
       "js": [
-        "core.js",
         "content.js"
       ],
       "run_at": "document_start",

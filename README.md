@@ -60,16 +60,17 @@ The page bridge is observable by scripts on the Copilot page. It is an instrumen
 
 ## Development and validation
 
-No build or dependency installation is required to load `extension/` in Chrome. Node.js 18+ is needed only for development checks; Python 3 is needed only for packaging or the local preview.
+No build or dependency installation is required to load the prebuilt `extension/` folder in Chrome. Edit `src/` for development and run `npm run build` to regenerate the three self-contained runtime scripts; there is no separate core script dependency at runtime. Node.js 18+ is needed only for development checks; Python 3 is needed only for packaging or the local preview.
 
 ```sh
+npm run build
 npm run check
 npm test
 npm run package
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.4.zip` with `manifest.json` in the ZIP root.
+For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.5.zip` with `manifest.json` in the ZIP root.
 
 Automated coverage includes multi-record framing, all six models, native socket behavior, settings-load races, cross-tab preference and visibility propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, and metadata privacy. The browser fixture checks both selectors, panel visibility, usage states, collapse behavior, and active-tab popup readings.
 
@@ -82,3 +83,9 @@ Automated coverage includes multi-record framing, all six models, native socket 
 - [Research baseline](docs/research.md): source revisions, findings, and outstanding live checks.
 
 No upstream implementation has been incorporated.
+
+## v0.1.5 startup fix
+
+The runtime scripts are now self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Model routing and parsing behavior are otherwise unchanged; live validation remains necessary.
+
+To try this update, extract it into a new folder, point the Chrome extension at that folder (or replace every file in its current folder), reload the extension at `chrome://extensions`, then reload the Copilot tab. Clear old extension errors before sending one new message so stale errors are not confused with current ones. Disable any older model-picker extension during the test to keep the comparison controlled.
