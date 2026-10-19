@@ -1,4 +1,4 @@
-M365 Copilot Extender v0.1.0
+M365 Copilot Extender v0.1.1
 
 1. Extract this ZIP to a permanent folder on your Windows computer.
 2. In Google Chrome, open chrome://extensions and enable Developer mode.

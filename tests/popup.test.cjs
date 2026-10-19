@@ -9,8 +9,10 @@ function popup(store, snapshot = { hookReady: true, observed: { scenario: 'Offic
     assert.equal(id, 7); assert.equal(message.type, 'M365_EXTENDER_SNAPSHOT'); return snapshot;
   } } };
   const context = vm.createContext({ chrome, document: { getElementById() { return {}; } }, setInterval() {},
-    M365ExtenderPanel: { mount(host, handlers) { callbacks = handlers; return { update(next) { state = clone(next); } }; } } });
-  load(context, 'core.js'); load(context, 'popup.js');
+  });
+  load(context, 'core.js');
+  context.M365ExtenderPanel = { mount(host, handlers) { callbacks = handlers; return { update(next) { state = clone(next); } }; } };
+  load(context, 'popup.js');
   return { callbacks, chrome, state: () => state };
 }
 test('popup shows active-tab metadata and saves model plus independent panel visibility', async () => {

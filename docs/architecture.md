@@ -2,7 +2,7 @@
 
 ## Components
 
-`manifest.json` installs two static `document_start` content-script groups on `https://m365.cloud.microsoft/*`. `core.js` is loaded independently in each world. `page-hook.js` runs in MAIN so it can intercept the page's WebSockets; `content.js` and `panel.js` run in ISOLATED so they can use extension storage. Chrome's toolbar popup uses `popup.js` and the same panel renderer.
+`manifest.json` installs two static `document_start` content-script groups on `https://m365.cloud.microsoft/*`. `core.js` contains the shared protocol helpers and panel renderer and is loaded independently in each world. `page-hook.js` runs in MAIN so it can intercept the page's WebSockets; `content.js` runs in ISOLATED so it can use extension storage and mount the panel. Chrome's toolbar popup uses `popup.js` and the same renderer from `core.js`. Popup page styles are embedded in `popup.html`.
 
 The hook proxies the WebSocket constructor to attach passive response listeners early. It also wraps the native prototype's `send`, checking only `wss://substrate.office.com/m365Copilot/Chathub/…` sockets. It preserves the native constructor's prototype, static constants, `instanceof`, and subclass behavior. Unrelated sockets pass through. JSON payloads are split/rejoined on `\x1e`; only type `1`/`4`, target `chat`, with an object at `arguments[0]` are modified. Every qualifying request uses the current preference, including follow-up turns.
 

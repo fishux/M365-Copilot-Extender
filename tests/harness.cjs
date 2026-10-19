@@ -55,11 +55,12 @@ function environment(store = createStore()) {
   function addContent() {
     const isolated = world(); isolated.chrome = store.chrome;
     isolated.document = { body: { append(host) { hosts.push(host); } }, createElement() { return { style: {} }; } };
+    load(isolated, 'core.js');
     isolated.M365ExtenderPanel = { mount(host, callbacks) {
       const panel = { host, callbacks, state: null, update(state) { this.state = clone(state); } };
       panels.push(panel); return panel;
     } };
-    load(isolated, 'core.js'); load(isolated, 'content.js');
+    load(isolated, 'content.js');
     return isolated;
   }
   return { main, addContent, store, messages, panels, hosts, FakeSocket, timers,
