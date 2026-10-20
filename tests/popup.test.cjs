@@ -15,13 +15,14 @@ function popup(store, snapshot = { hookReady: true, observed: { scenario: 'Offic
   load(context, 'popup.js');
   return { callbacks, chrome, state: () => state };
 }
-test('popup shows active-tab metadata and saves model plus independent panel visibility', async () => {
+test('popup shows active-tab metadata and saves the model without a page visibility setting', async () => {
   const store = createStore({ selectedTone: 'Gpt_5_5_Reasoning', inPageEnabled: true });
   const view = popup(store); await settle();
   assert.equal(view.state().tone, 'Gpt_5_5_Reasoning'); assert.equal(view.state().observed.metering.GPT61SolQueryDaily, 6);
-  await view.callbacks.onSelect('Gpt_6_Sol_Reasoning'); await view.callbacks.onVisibility(false); await settle();
-  assert.equal(store.data.selectedTone, 'Gpt_6_Sol_Reasoning'); assert.equal(store.data.inPageEnabled, false);
-  assert.equal(view.state().tone, 'Gpt_6_Sol_Reasoning'); assert.equal(view.state().inPageEnabled, false);
+  await view.callbacks.onSelect('Gpt_6_Sol_Reasoning'); await settle();
+  assert.equal(view.callbacks.onVisibility, undefined);
+  assert.equal(store.data.selectedTone, 'Gpt_6_Sol_Reasoning'); assert.equal(store.data.inPageEnabled, true);
+  assert.equal(view.state().tone, 'Gpt_6_Sol_Reasoning'); assert.equal(view.state().inPageEnabled, undefined);
 });
 test('popup startup resolves changed and unchanged preferences independently', async () => {
   const store = createStore(); let resolve;
@@ -29,7 +30,7 @@ test('popup startup resolves changed and unchanged preferences independently', a
   const view = popup(store);
   await store.chrome.storage.local.set({ selectedTone: 'Gpt_5_6_Reasoning' });
   resolve({ selectedTone: 'Magic', inPageEnabled: false }); await settle();
-  assert.equal(view.state().tone, 'Gpt_5_6_Reasoning'); assert.equal(view.state().inPageEnabled, false);
+  assert.equal(view.state().tone, 'Gpt_5_6_Reasoning'); assert.equal(view.state().inPageEnabled, undefined);
 });
 test('popup retains saved preference and reports a failed settings write', async () => {
   const store = createStore({ selectedTone: 'Magic' }); const view = popup(store); await settle();

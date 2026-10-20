@@ -1,4 +1,4 @@
-M365 Copilot Extender v0.1.5
+M365 Copilot Extender v0.1.7
 
 1. Extract this ZIP to a permanent folder on your Windows computer.
 2. In Google Chrome, open chrome://extensions and enable Developer mode.
@@ -6,10 +6,9 @@ M365 Copilot Extender v0.1.5
 4. Pin M365 Copilot Extender from Chrome's Extensions menu.
 5. Open or reload https://m365.cloud.microsoft after installation.
 
-Use the dropdown in the toolbar popup or the floating Copilot panel.
+Use the model dropdown in the Chrome toolbar popup.
 GPT-6.1 Sol is the initial default. Your selection persists in this Chrome
-profile across tabs and browser restarts. The toolbar switch hides or restores
-the floating panel without turning off the model override.
+profile across tabs and browser restarts. No panel is displayed on Copilot.
 
 Send a chat message to obtain usage allowances from Copilot's response.
 Numbers are remaining messages, not estimated totals. Missing values are unknown.

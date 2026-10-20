@@ -1,13 +1,11 @@
 (() => {
   "use strict";
   const core = globalThis.M365ExtenderCore;
-  const state = { tone: core.DEFAULT_TONE, inPageEnabled: true, loaded: false, saving: false,
+  const state = { tone: core.DEFAULT_TONE, loaded: false, saving: false,
     connected: false, hookReady: false, error: "", observed: {} };
-  const revisions = { selectedTone: 0, inPageEnabled: 0 };
+  const revisions = { selectedTone: 0 };
   const panel = globalThis.M365ExtenderPanel.mount(document.getElementById("panel"), {
-    popup: true,
-    onSelect: tone => save({ selectedTone: tone }),
-    onVisibility: value => save({ inPageEnabled: value })
+    onSelect: tone => save({ selectedTone: tone })
   });
   const render = () => panel.update(state);
   async function save(patch) {
@@ -20,7 +18,6 @@
   }
   function applySettings(settings) {
     if ("selectedTone" in settings) state.tone = core.modelFor(settings.selectedTone)?.tone || core.DEFAULT_TONE;
-    if ("inPageEnabled" in settings) state.inPageEnabled = settings.inPageEnabled !== false;
   }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
@@ -29,7 +26,7 @@
     render();
   });
   const initialRevisions = { ...revisions };
-  chrome.storage.local.get(["selectedTone", "inPageEnabled"]).then(settings => {
+  chrome.storage.local.get(["selectedTone"]).then(settings => {
     for (const key of Object.keys(revisions)) {
       if (revisions[key] === initialRevisions[key] && key in settings) applySettings({ [key]: settings[key] });
     }

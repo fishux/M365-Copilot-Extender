@@ -1,6 +1,6 @@
 // Test-only Chrome mock. Never included in the extension ZIP.
 window.fixtureStore = {
-  data: JSON.parse(localStorage.getItem('extender-fixture-settings') || '{"selectedTone":"Gpt_61_Sol_Reasoning","inPageEnabled":true}'),
+  data: JSON.parse(localStorage.getItem('extender-fixture-settings') || '{"selectedTone":"Gpt_61_Sol_Reasoning"}'),
   listeners: [],
   async get() { return { ...this.data }; },
   async set(patch) {

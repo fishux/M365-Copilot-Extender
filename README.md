@@ -2,9 +2,9 @@
 
 A lightweight Chrome Manifest V3 extension for persistent model selection in [Microsoft 365 Copilot](https://m365.cloud.microsoft).
 
-Choose a model once using the Chrome toolbar popup or the floating Copilot panel. Your choice applies to outgoing chat requests across Copilot tabs and survives browser restarts. GPT-6.1 Sol is the initial default.
+Choose a model once using the Chrome toolbar popup. Your choice applies to outgoing chat requests across Copilot tabs and survives browser restarts. GPT-6.1 Sol is the initial default.
 
-The popup includes a **Show panel on Copilot** switch. Hiding the panel leaves the override active. Both surfaces support system light/dark appearance, keyboard navigation, and always-visible connection details.
+The toolbar popup supports system light/dark appearance, keyboard navigation, and always-visible connection details. Nothing is displayed over the Copilot page.
 
 ## Install on Windows
 
@@ -12,7 +12,7 @@ The popup includes a **Show panel on Copilot** switch. Hiding the panel leaves t
 2. In Google Chrome, open `chrome://extensions` and enable **Developer mode**.
 3. Click **Load unpacked**. Select this repository's `extension` folder, or the extracted package folder containing `manifest.json`.
 4. Pin **M365 Copilot Extender** from Chrome's Extensions menu.
-5. Reload any already-open Copilot tabs. Choose a model in either selector and send a message.
+5. Reload any already-open Copilot tabs. Choose a model in the toolbar popup and send a message.
 
 When updating, replace the extension files, click **Reload** on its `chrome://extensions` card, then reload Copilot. Keep the unpacked folder in place so Chrome can load it on restart. Settings belong to this Chrome profile; they do not synchronize across separate profiles or devices.
 
@@ -45,16 +45,16 @@ Connection details show the observed scenario, the last requested model, result 
 
 ## Conversation capacity and expiry
 
-Both interfaces include a compact conversation section below model usage:
+The toolbar popup includes a compact conversation section below model usage:
 
 - **Capacity:** the server's used/maximum message counts and a slim meter. It highlights at 90% capacity. The maximum is read from Copilot, never assumed to be 600, and is separate from model allowances. Hover the count for remaining conversation messages.
 - **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
 
-These are readings from the last observed reply in this tab, not a live query of whichever history item is open. Before a response, missing capacity shows **Awaiting reply** and missing or invalid expiry shows **Not reported**. Final replies with missing fields clear old values. New socket connections also clear the previous readings. No per-conversation data is saved to disk. Countdown labels refresh locally without Microsoft requests.
+These are readings from the last observed reply in this tab, not a live query of whichever history item is open. Before a response, missing capacity shows **Awaiting reply** and missing or invalid expiry shows **Not reported**. The last valid values remain visible until Copilot reports replacements, including across partial or final replies that omit fields. Merely opening a background socket does not clear them. Sending a chat on a different socket starts a fresh snapshot; late results from the older socket are ignored. No per-conversation data is saved to disk. Countdown labels refresh locally without Microsoft requests.
 
 ## Privacy and permissions
 
-The only extension API permission is `storage`, with content scripts scoped to `https://m365.cloud.microsoft/*`. There are no third-party requests, analytics, credentials, remote scripts, service workers, or runtime dependencies. Only the selected model and panel visibility are saved in `chrome.storage.local`. The page hook parses chat frames locally, but forwards only allowlisted metadata and numeric quota values; it does not forward or save prompts, replies, access tokens, full socket URLs, or account identifiers.
+The only extension API permission is `storage`, with content scripts scoped to `https://m365.cloud.microsoft/*`. There are no third-party requests, analytics, credentials, remote scripts, service workers, or runtime dependencies. Only the selected model is saved in `chrome.storage.local`. The page hook parses chat frames locally, but forwards only allowlisted metadata and numeric quota values; it does not forward or save prompts, replies, access tokens, full socket URLs, or account identifiers.
 
 The page bridge is observable by scripts on the Copilot page. It is an instrumentation channel, not an authenticated model-identity or security boundary. See [architecture and limitations](docs/architecture.md).
 
@@ -70,9 +70,9 @@ npm run package
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.5.zip` with `manifest.json` in the ZIP root.
+For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.7.zip` with `manifest.json` in the ZIP root.
 
-Automated coverage includes multi-record framing, all six models, native socket behavior, settings-load races, cross-tab preference and visibility propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, and metadata privacy. The browser fixture checks both selectors, panel visibility, usage states, collapse behavior, and active-tab popup readings.
+Automated coverage includes multi-record framing, all six models, native socket behavior, settings-load races, cross-tab preference propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, and metadata privacy. The browser fixture checks the toolbar selector, usage states, active-tab readings, and absence of injected page controls.
 
 **Live account validation remains required.** These checks establish extension behavior against fixtures; they do not establish current Microsoft availability, backend identity, or account-specific quota policies. No Microsoft account credentials are needed for the test suite.
 
@@ -84,8 +84,8 @@ Automated coverage includes multi-record framing, all six models, native socket 
 
 No upstream implementation has been incorporated.
 
-## v0.1.5 startup fix
+## Startup fix
 
-The runtime scripts are now self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Model routing and parsing behavior are otherwise unchanged; live validation remains necessary.
+The runtime scripts are now self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Live validation remains necessary.
 
 To try this update, extract it into a new folder, point the Chrome extension at that folder (or replace every file in its current folder), reload the extension at `chrome://extensions`, then reload the Copilot tab. Clear old extension errors before sending one new message so stale errors are not confused with current ones. Disable any older model-picker extension during the test to keep the comparison controlled.
