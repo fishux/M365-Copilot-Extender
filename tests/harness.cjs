@@ -28,7 +28,7 @@ function createStore(initial = {}) {
 }
 
 function environment(store = createStore(), { bundled = false } = {}) {
-  const messages = [], timers = new Map(), subscribers = [], panels = [], hosts = [];
+  const messages = [], timers = new Map(), subscribers = [], contents = [];
   const origin = 'https://m365.cloud.microsoft';
   let timerId = 0;
   class FakeSocket extends EventTarget {
@@ -55,27 +55,18 @@ function environment(store = createStore(), { bundled = false } = {}) {
   if (bundled) loadBundle(main, 'page-hook.js');
   else { load(main, 'core.js'); load(main, 'page-hook.js'); }
   function addContent() {
-    const isolated = world(); isolated.chrome = store.chrome;
-    if (bundled) {
-      let snapshotListener;
-      isolated.chrome = { ...store.chrome, runtime: { ...store.chrome.runtime, onMessage: { addListener(listener) { snapshotListener = listener; } } } };
-      // Keep DOMContentLoaded pending: startup, storage, interception and response
-      // observation must work even before the panel has a document body to mount.
-      isolated.document = { body: null, addEventListener() {} };
-      loadBundle(isolated, 'content.js');
-      isolated.snapshot = () => { let result; snapshotListener({ type: 'M365_EXTENDER_SNAPSHOT' }, { id: store.chrome.runtime.id }, value => { result = clone(value); }); return result; };
-      return isolated;
-    }
-    isolated.document = { body: { append(host) { hosts.push(host); } }, createElement() { return { style: {} }; } };
-    load(isolated, 'core.js');
-    isolated.M365ExtenderPanel = { mount(host, callbacks) {
-      const panel = { host, callbacks, state: null, update(state) { this.state = clone(state); } };
-      panels.push(panel); return panel;
-    } };
-    load(isolated, 'content.js');
+    const isolated = world();
+    let snapshotListener;
+    isolated.chrome = { ...store.chrome, runtime: { ...store.chrome.runtime, onMessage: { addListener(listener) { snapshotListener = listener; } } } };
+    // No document is provided: the bridge must run without touching page DOM.
+    if (bundled) loadBundle(isolated, 'content.js');
+    else { load(isolated, 'core.js'); load(isolated, 'content.js'); }
+    isolated.snapshot = () => { let result; snapshotListener({ type: 'M365_EXTENDER_SNAPSHOT' }, { id: store.chrome.runtime.id }, value => { result = clone(value); }); return result; };
+    contents.push(isolated);
     return isolated;
   }
-  return { main, addContent, store, messages, panels, hosts, FakeSocket, timers,
+
+  return { main, addContent, store, messages, contents, FakeSocket, timers,
     timeout(delay) { for (const [id, timer] of [...timers]) if (timer.delay === delay) { timers.delete(id); timer.fn(); } } };
 }
 

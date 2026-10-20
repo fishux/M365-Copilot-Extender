@@ -1,6 +1,6 @@
 {
   "name": "m365-copilot-extender",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Dependency-free Chrome extension for persistent Copilot model selection.",
   "scripts": {

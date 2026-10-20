@@ -11,7 +11,7 @@ test('saved tone applies before first chat; native identity, constants and subcl
   assert.ok(socket instanceof env.main.WebSocket); assert.ok(socket instanceof env.FakeSocket);
   assert.equal(env.main.WebSocket.OPEN, 1);
   class SubSocket extends env.main.WebSocket {} assert.ok(new SubSocket(endpoint) instanceof SubSocket);
-  assert.equal(env.panels[0].state.observed.appliedTone, 'Gpt_5_6_Reasoning');
+  assert.equal(env.contents[0].snapshot().observed.appliedTone, 'Gpt_5_6_Reasoning');
 });
 test('cold-start queues the chat and following records in order until storage resolves', async () => {
   const store = createStore({ selectedTone: 'Gpt_6_Sol_Reasoning' });
@@ -47,24 +47,16 @@ test('unrelated sockets pass through byte-for-byte; diagnostics contain no priva
   socket.receive(JSON.stringify({ type: 2, item: { messages: [{ author: 'bot', contentOrigin: 'DeepLeo', text: 'PRIVATE REPLY' }], result: { value: 'Success', message: 'PRIVATE RESULT' } } }) + '\x1e');
   await settle(); assert.ok(!JSON.stringify(env.messages).includes('PRIVATE'));
 });
-test('selection and visibility changes propagate to two tabs and survive a new context', async () => {
-  const store = createStore(); const a = environment(store), b = environment(store);
+test('selection changes propagate to two tabs and survive a new context without a page UI', async () => {
+  const store = createStore({ inPageEnabled: true }); // Legacy preference is ignored.
+  const a = environment(store), b = environment(store);
   a.addContent(); b.addContent(); await settle();
-  await a.panels[0].callbacks.onSelect('Gpt_6_Reasoning'); await settle();
-  assert.equal(b.panels[0].state.tone, 'Gpt_6_Reasoning');
-  await store.chrome.storage.local.set({ inPageEnabled: false }); await settle();
-  assert.equal(a.hosts[0].style.display, 'none'); assert.equal(b.hosts[0].style.display, 'none');
+  await store.chrome.storage.local.set({ selectedTone: 'Gpt_6_Reasoning' }); await settle();
   const restarted = environment(store); restarted.addContent(); await settle();
-  assert.equal(restarted.panels[0].state.tone, 'Gpt_6_Reasoning'); assert.equal(restarted.hosts[0].style.display, 'none');
-  const socket = new b.main.WebSocket(endpoint); socket.send(chat());
-  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_6_Reasoning');
-});
-test('failed saves retain the previous active preference', async () => {
-  const env = environment(); env.addContent(); await settle();
-  env.store.chrome.storage.local.set = async () => { throw new Error('disk full'); };
-  await env.panels[0].callbacks.onSelect('Gpt_5_5_Reasoning'); await settle();
-  assert.equal(env.panels[0].state.tone, 'Gpt_61_Sol_Reasoning');
-  assert.match(env.panels[0].state.error, /Could not save/);
+  for (const env of [a, b, restarted]) {
+    const socket = new env.main.WebSocket(endpoint); socket.send(chat());
+    assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_6_Reasoning');
+  }
 });
 test('failed initial storage read passes requests through without falsely reporting an override', async () => {
   const store = createStore(); store.chrome.storage.local.get = async () => { throw new Error('storage unavailable'); };
@@ -72,26 +64,27 @@ test('failed initial storage read passes requests through without falsely report
   const socket = new env.main.WebSocket(endpoint); socket.send(chat()); await settle();
   assert.equal(socket.sent[0], chat());
   assert.ok(!env.messages.some(message => message.kind === 'applied'));
-  assert.match(env.panels[0].state.error, /could not be loaded/);
+  assert.match(env.contents[0].snapshot().observed.warning, /Preferences unavailable/);
 });
 test('final response updates usage, honors zero, retains missing data and ignores older sockets', async () => {
   const env = environment(); env.addContent(); await settle();
   const first = new env.main.WebSocket(endpoint); first.send(chat()); await settle();
   const frame = allowance => JSON.stringify({ type: 2, item: { result: { value: 'Success' }, throttling: { metering: { GPT61SolQueryDaily: { remainingAllowance: allowance } } } } }) + '\x1e';
-  first.receive(frame(0)); await settle(); assert.equal(env.panels[0].state.observed.metering.GPT61SolQueryDaily, 0);
+  first.receive(frame(0)); await settle(); assert.equal(env.contents[0].snapshot().observed.metering.GPT61SolQueryDaily, 0);
   const second = new env.main.WebSocket(endpoint); second.send(chat()); await settle();
   second.receive(frame(5)); first.receive(frame(30)); await settle();
-  assert.equal(env.panels[0].state.observed.metering.GPT61SolQueryDaily, 5);
+  assert.equal(env.contents[0].snapshot().observed.metering.GPT61SolQueryDaily, 5);
   second.receive('{"type":2,"item":{"result":{"value":"Success"}}}\x1e'); await settle();
-  assert.deepEqual(env.panels[0].state.observed.metering, { GPT61SolQueryDaily: 5 });
+  assert.deepEqual(env.contents[0].snapshot().observed.metering, { GPT61SolQueryDaily: 5 });
 });
 test('cross-tab changes arriving during startup are not overwritten by a stale initial read', async () => {
   const store = createStore(); let resolve;
   store.chrome.storage.local.get = () => new Promise(r => { resolve = r; });
   const env = environment(store); env.addContent();
-  await store.chrome.storage.local.set({ selectedTone: 'Gpt_5_5_Reasoning', inPageEnabled: false });
-  resolve({ selectedTone: 'Magic', inPageEnabled: true }); await settle();
-  assert.equal(env.panels[0].state.tone, 'Gpt_5_5_Reasoning'); assert.equal(env.hosts[0].style.display, 'none');
+  await store.chrome.storage.local.set({ selectedTone: 'Gpt_5_5_Reasoning' });
+  resolve({ selectedTone: 'Magic' }); await settle();
+  const socket = new env.main.WebSocket(endpoint); socket.send(chat());
+  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_5_5_Reasoning');
 });
 test('conversation capacity and expiry flow through the hook without persisting per-chat data', async () => {
   const env = environment(); env.addContent(); await settle();
@@ -100,14 +93,14 @@ test('conversation capacity and expiry flow through the hook without persisting 
     conversationExpiryTime: '2026-11-18T22:30:00+10:00',
     throttling: { numUserMessagesInConversation: 540, maxNumUserMessagesInConversation: 600 }
   } }) + '\x1e'); await settle();
-  assert.deepEqual(env.panels[0].state.observed.conversation, { used: 540, limit: 600 });
-  assert.equal(env.panels[0].state.observed.expiresAt, '2026-11-18T12:30:00.000Z');
+  assert.deepEqual(env.contents[0].snapshot().observed.conversation, { used: 540, limit: 600 });
+  assert.equal(env.contents[0].snapshot().observed.expiresAt, '2026-11-18T12:30:00.000Z');
   assert.deepEqual(env.store.data, {});
   socket.receive('{"type":1,"target":"update","arguments":[{"messages":[]}]}\x1e'); await settle();
-  assert.equal(env.panels[0].state.observed.conversation.used, 540);
+  assert.equal(env.contents[0].snapshot().observed.conversation.used, 540);
   socket.receive('{"type":2,"item":{"result":{"value":"Success"}}}\x1e'); await settle();
-  assert.equal(env.panels[0].state.observed.conversation.used, 540);
-  assert.equal(env.panels[0].state.observed.expiresAt, '2026-11-18T12:30:00.000Z');
+  assert.equal(env.contents[0].snapshot().observed.conversation.used, 540);
+  assert.equal(env.contents[0].snapshot().observed.expiresAt, '2026-11-18T12:30:00.000Z');
 });
 test('a chat on a new socket clears prior conversation data and ignores older expiry updates', async () => {
   const env = environment(); env.addContent(); await settle();
@@ -116,6 +109,6 @@ test('a chat on a new socket clears prior conversation data and ignores older ex
   first.receive(frame); await settle();
   const second = new env.main.WebSocket(endpoint); second.send(chat()); await settle();
   first.receive(frame); await settle();
-  assert.equal(env.panels[0].state.observed.conversation, undefined);
-  assert.equal(env.panels[0].state.observed.expiresAt, undefined);
+  assert.equal(env.contents[0].snapshot().observed.conversation, undefined);
+  assert.equal(env.contents[0].snapshot().observed.expiresAt, undefined);
 });
