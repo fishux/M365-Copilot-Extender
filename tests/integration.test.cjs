@@ -74,7 +74,7 @@ test('failed initial storage read passes requests through without falsely report
   assert.ok(!env.messages.some(message => message.kind === 'applied'));
   assert.match(env.panels[0].state.error, /could not be loaded/);
 });
-test('final response updates usage, honors zero, clears missing data and ignores older sockets', async () => {
+test('final response updates usage, honors zero, retains missing data and ignores older sockets', async () => {
   const env = environment(); env.addContent(); await settle();
   const first = new env.main.WebSocket(endpoint); first.send(chat()); await settle();
   const frame = allowance => JSON.stringify({ type: 2, item: { result: { value: 'Success' }, throttling: { metering: { GPT61SolQueryDaily: { remainingAllowance: allowance } } } } }) + '\x1e';
@@ -83,7 +83,7 @@ test('final response updates usage, honors zero, clears missing data and ignores
   second.receive(frame(5)); first.receive(frame(30)); await settle();
   assert.equal(env.panels[0].state.observed.metering.GPT61SolQueryDaily, 5);
   second.receive('{"type":2,"item":{"result":{"value":"Success"}}}\x1e'); await settle();
-  assert.deepEqual(env.panels[0].state.observed.metering, {});
+  assert.deepEqual(env.panels[0].state.observed.metering, { GPT61SolQueryDaily: 5 });
 });
 test('cross-tab changes arriving during startup are not overwritten by a stale initial read', async () => {
   const store = createStore(); let resolve;
@@ -106,10 +106,10 @@ test('conversation capacity and expiry flow through the hook without persisting 
   socket.receive('{"type":1,"target":"update","arguments":[{"messages":[]}]}\x1e'); await settle();
   assert.equal(env.panels[0].state.observed.conversation.used, 540);
   socket.receive('{"type":2,"item":{"result":{"value":"Success"}}}\x1e'); await settle();
-  assert.equal(env.panels[0].state.observed.conversation, undefined);
-  assert.equal(env.panels[0].state.observed.expiresAt, undefined);
+  assert.equal(env.panels[0].state.observed.conversation.used, 540);
+  assert.equal(env.panels[0].state.observed.expiresAt, '2026-11-18T12:30:00.000Z');
 });
-test('a new socket clears prior conversation data and ignores older expiry updates', async () => {
+test('a chat on a new socket clears prior conversation data and ignores older expiry updates', async () => {
   const env = environment(); env.addContent(); await settle();
   const first = new env.main.WebSocket(endpoint); first.send(chat()); await settle();
   const frame = JSON.stringify({ type: 2, item: { conversationExpiryTime: '2026-11-18T12:00:00Z', throttling: { numUserMessagesInConversation: 600, maxNumUserMessagesInConversation: 600 } } }) + '\x1e';

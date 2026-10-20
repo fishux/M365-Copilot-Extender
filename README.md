@@ -50,7 +50,7 @@ Both interfaces include a compact conversation section below model usage:
 - **Capacity:** the server's used/maximum message counts and a slim meter. It highlights at 90% capacity. The maximum is read from Copilot, never assumed to be 600, and is separate from model allowances. Hover the count for remaining conversation messages.
 - **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
 
-These are readings from the last observed reply in this tab, not a live query of whichever history item is open. Before a response, missing capacity shows **Awaiting reply** and missing or invalid expiry shows **Not reported**. Final replies with missing fields clear old values. New socket connections also clear the previous readings. No per-conversation data is saved to disk. Countdown labels refresh locally without Microsoft requests.
+These are readings from the last observed reply in this tab, not a live query of whichever history item is open. Before a response, missing capacity shows **Awaiting reply** and missing or invalid expiry shows **Not reported**. The last valid values remain visible until Copilot reports replacements, including across partial or final replies that omit fields. Merely opening a background socket does not clear them. Sending a chat on a different socket starts a fresh snapshot; late results from the older socket are ignored. No per-conversation data is saved to disk. Countdown labels refresh locally without Microsoft requests.
 
 ## Privacy and permissions
 
@@ -70,7 +70,7 @@ npm run package
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.5.zip` with `manifest.json` in the ZIP root.
+For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v0.1.6.zip` with `manifest.json` in the ZIP root.
 
 Automated coverage includes multi-record framing, all six models, native socket behavior, settings-load races, cross-tab preference and visibility propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, and metadata privacy. The browser fixture checks both selectors, panel visibility, usage states, collapse behavior, and active-tab popup readings.
 
@@ -84,7 +84,7 @@ Automated coverage includes multi-record framing, all six models, native socket 
 
 No upstream implementation has been incorporated.
 
-## v0.1.5 startup fix
+## v0.1.6 startup fix
 
 The runtime scripts are now self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Model routing and parsing behavior are otherwise unchanged; live validation remains necessary.
 

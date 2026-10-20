@@ -124,16 +124,15 @@
     }
     return candidates.flatMap(({ value, final }) => {
       const output = {};
-      if ("conversationExpiryTime" in value) output.expiresAt = parseExpiry(value.conversationExpiryTime);
+      const expiresAt = parseExpiry(value.conversationExpiryTime);
+      if (expiresAt) output.expiresAt = expiresAt;
       if (isRecord(value.throttling)) {
-        if (isRecord(value.throttling.metering) || final) {
+        if (isRecord(value.throttling.metering)) {
           output.metering = parseMetering(value.throttling.metering);
         }
         const used = count(value.throttling.numUserMessagesInConversation);
         const limit = count(value.throttling.maxNumUserMessagesInConversation);
         if (used !== null && limit !== null) output.conversation = { used, limit };
-      } else if (final) {
-        output.metering = {};
       }
       if (allowedResults.includes(value.result?.value)) output.result = value.result.value;
       else if (typeof value.result?.value === "string") output.result = "Other";
@@ -372,6 +371,9 @@
   function sendNow(socket, state, data) {
     const rewritten = core.rewrite(data, selectedTone);
     const result = nativeSend.call(socket, rewritten.data);
+    if (core.parseRecords(data).some(core.isChat)) {
+      emit("request", { scenario: state.scenario, socketId: state.socketId });
+    }
     if (rewritten.tones.length) {
       state.tone = rewritten.tones.at(-1);
       emit("applied", { tone: state.tone, scenario: state.scenario, socketId: state.socketId });

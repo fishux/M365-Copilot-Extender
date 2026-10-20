@@ -44,6 +44,9 @@
   function sendNow(socket, state, data) {
     const rewritten = core.rewrite(data, selectedTone);
     const result = nativeSend.call(socket, rewritten.data);
+    if (core.parseRecords(data).some(core.isChat)) {
+      emit("request", { scenario: state.scenario, socketId: state.socketId });
+    }
     if (rewritten.tones.length) {
       state.tone = rewritten.tones.at(-1);
       emit("applied", { tone: state.tone, scenario: state.scenario, socketId: state.socketId });

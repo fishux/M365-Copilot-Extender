@@ -54,8 +54,8 @@ test('reads quota and refusals from final type 2 and streaming type 1, without l
   assert.ok(!JSON.stringify(output).includes('PRIVATE'));
   assert.equal(core.readMetadata({ type: 1, target: 'update', arguments: [item] }).length, 1);
 });
-test('final missing quota clears old readings; streaming-only absence does not', () => {
-  assert.deepEqual(clone(core.readMetadata({ type: 2, item: { result: { value: 'Success' } } })), [{ metering: {}, result: 'Success', final: true }]);
+test('missing metadata remains absent in both final and streaming records', () => {
+  assert.deepEqual(clone(core.readMetadata({ type: 2, item: { result: { value: 'Success' } } })), [{ result: 'Success', final: true }]);
   assert.deepEqual(clone(core.readMetadata({ type: 1, target: 'update', arguments: [{ throttling: {} }] })), []);
 });
 test('capacity meter uses server limits, handles zero, and clamps over-limit readings', () => {
@@ -91,5 +91,5 @@ test('final and streaming metadata carry only normalized server expiry timestamp
   const item = { conversationExpiryTime: '2026-11-18T22:30:00+10:00' };
   assert.equal(core.readMetadata({ type: 2, item })[0].expiresAt, '2026-11-18T12:30:00.000Z');
   assert.equal(core.readMetadata({ type: 1, target: 'update', arguments: [item] })[0].expiresAt, '2026-11-18T12:30:00.000Z');
-  assert.equal(core.readMetadata({ type: 2, item: { conversationExpiryTime: 'invalid' } })[0].expiresAt, null);
+  assert.deepEqual(clone(core.readMetadata({ type: 2, item: { conversationExpiryTime: 'invalid' } })), []);
 });

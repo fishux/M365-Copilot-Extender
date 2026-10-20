@@ -124,16 +124,15 @@
     }
     return candidates.flatMap(({ value, final }) => {
       const output = {};
-      if ("conversationExpiryTime" in value) output.expiresAt = parseExpiry(value.conversationExpiryTime);
+      const expiresAt = parseExpiry(value.conversationExpiryTime);
+      if (expiresAt) output.expiresAt = expiresAt;
       if (isRecord(value.throttling)) {
-        if (isRecord(value.throttling.metering) || final) {
+        if (isRecord(value.throttling.metering)) {
           output.metering = parseMetering(value.throttling.metering);
         }
         const used = count(value.throttling.numUserMessagesInConversation);
         const limit = count(value.throttling.maxNumUserMessagesInConversation);
         if (used !== null && limit !== null) output.conversation = { used, limit };
-      } else if (final) {
-        output.metering = {};
       }
       if (allowedResults.includes(value.result?.value)) output.result = value.result.value;
       else if (typeof value.result?.value === "string") output.result = "Other";
@@ -384,15 +383,18 @@
     } else if (message.kind === "configured") {
       state.hookReady = true;
     } else if (message.kind === "connection") {
-      // A new socket may belong to a new signed-in account. Do not reuse quotas.
-      activeSocketId = message.socketId;
-      state.observed = { scenario: safeScenario(message.scenario) };
-    } else if (message.kind === "applied" && core.modelFor(message.tone)) {
+      // Copilot may pre-open another socket after a reply. Keep the last
+      // readings until a chat is actually sent on a different connection.
+      if (activeSocketId === null) {
+        activeSocketId = message.socketId;
+        state.observed.scenario = safeScenario(message.scenario);
+      }
+    } else if (message.kind === "request" || (message.kind === "applied" && core.modelFor(message.tone))) {
       if (activeSocketId !== message.socketId) state.observed = {};
       activeSocketId = message.socketId;
-      state.observed.appliedTone = message.tone;
+      if (message.kind === "applied") state.observed.appliedTone = message.tone;
       state.observed.scenario = safeScenario(message.scenario);
-      delete state.observed.warning; delete state.observed.result; delete state.observed.origin;
+      delete state.observed.warning;
     } else if (message.kind === "warning" && warnings[message.code]) {
       if (message.socketId && message.socketId !== activeSocketId) return;
       observed.warning = warnings[message.code];
@@ -401,15 +403,17 @@
       observed.scenario = safeScenario(message.scenario);
       if (message.metering && typeof message.metering === "object") {
         // Revalidate data from the page, which is not an authenticated boundary.
-        observed.metering = core.parseMetering(Object.fromEntries(Object.entries(message.metering).map(([key, value]) => [key, { remainingAllowance: value }])));
-        observed.quotaAt = Date.now();
+        const metering = core.parseMetering(Object.fromEntries(Object.entries(message.metering).map(([key, value]) => [key, { remainingAllowance: value }])));
+        if (Object.keys(metering).length) {
+          observed.metering = { ...observed.metering, ...metering };
+          observed.quotaAt = Date.now();
+        }
       }
       if (core.allowedResults.includes(message.result)) observed.result = message.result;
       if (core.allowedOrigins.includes(message.origin)) observed.origin = message.origin;
       if (core.count(message.conversation?.used) !== null && core.count(message.conversation?.limit) !== null) observed.conversation = { used: message.conversation.used, limit: message.conversation.limit };
-      else if (message.final) delete observed.conversation;
-      if ("expiresAt" in message) observed.expiresAt = core.parseExpiry(message.expiresAt);
-      else if (message.final) delete observed.expiresAt;
+      const expiresAt = core.parseExpiry(message.expiresAt);
+      if (expiresAt) observed.expiresAt = expiresAt;
     } else { return; }
     render();
   });

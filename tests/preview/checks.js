@@ -23,15 +23,15 @@ document.getElementById('checks').addEventListener('click', async () => {
     check(pageRoot.querySelector('.daily').textContent === '0', 'Zero quota stays visible');
     check(pageRoot.querySelector('.status-text').textContent.includes('usage limit'), 'Quota refusal is surfaced');
     copilot.simulateReply(30, 50, true); await pause(30);
-    check(pageRoot.querySelector('.counts').hidden && !pageRoot.querySelector('.pending').hidden, 'Missing quota stays unknown');
+    check(pageRoot.querySelector('.daily').textContent === '0' && !pageRoot.querySelector('.counts').hidden, 'Missing quota preserves last reported allowance');
     check(pageRoot.querySelector('.capacity-count').textContent === '4 / 600 messages', 'Conversation capacity is visible');
     check(pageRoot.querySelector('.capacity-track').getAttribute('aria-valuemax') === '600', 'Capacity meter uses the server limit');
     copilot.simulateConversation(600, 600, new Date(Date.now() - 1000).toISOString()); await pause(30);
     check(pageRoot.querySelector('.capacity-count').classList.contains('near-limit'), 'Full conversation is highlighted');
     check(pageRoot.querySelector('.expiry-value').textContent.endsWith('Passed'), 'Passed expiry is explicit');
     copilot.simulateConversation(undefined, undefined, 'invalid'); await pause(30);
-    check(pageRoot.querySelector('.capacity-track').hidden && pageRoot.querySelector('.capacity-count').textContent === 'Awaiting reply', 'Missing capacity does not invent a limit');
-    check(pageRoot.querySelector('.expiry-value').textContent === 'Not reported', 'Invalid expiry is unknown');
+    check(!pageRoot.querySelector('.capacity-track').hidden && pageRoot.querySelector('.capacity-count').textContent === '600 / 600 messages', 'Missing capacity preserves last reading');
+    check(pageRoot.querySelector('.expiry-value').textContent.endsWith('Passed'), 'Invalid expiry preserves last valid reading');
     const toggle = popupRoot.querySelector('input'); toggle.checked = false; toggle.dispatchEvent(new Event('change')); await pause(30);
     check(host.style.display === 'none', 'Popup hides the page panel');
     check(fixtureStore.data.inPageEnabled === false, 'Panel visibility is saved');
