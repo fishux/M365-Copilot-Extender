@@ -1,0 +1,56 @@
+[
+  {
+    "tone": "Gpt_61_Sol_Reasoning",
+    "label": "GPT-6.1 Sol",
+    "menuLabel": "GPT-6.1 Sol",
+    "badge": "6.1",
+    "budgetPrefix": "GPT61SolQuery",
+    "knownPaidCap": true,
+    "budgetEvidence": "Observed by upstream live probes: 40/day and 75/week on the paid route; included-route turns carry no metering"
+  },
+  {
+    "tone": "Gpt_6_Sol_Reasoning",
+    "label": "GPT-6 Sol",
+    "menuLabel": "GPT-6 Sol",
+    "badge": "6S",
+    "budgetPrefix": "GPT6SolQuery",
+    "knownPaidCap": false,
+    "budgetEvidence": "Not observed: upstream paid-route metering maps contained no GPT-6 Sol key; prefix is a name-based guess, shown only if Copilot ever reports it"
+  },
+  {
+    "tone": "Gpt_6_Reasoning",
+    "label": "GPT-6",
+    "menuLabel": "GPT-6 · Think deeper",
+    "badge": "6",
+    "budgetPrefix": null,
+    "knownPaidCap": false,
+    "budgetEvidence": "None: upstream found no priority-access allowance; limited only by the conversation cap and rate throttling"
+  },
+  {
+    "tone": "Gpt_5_6_Reasoning",
+    "label": "GPT-5.6",
+    "menuLabel": "GPT-5.6 · Think deeper",
+    "badge": "5.6",
+    "budgetPrefix": "GPT56Query",
+    "knownPaidCap": false,
+    "budgetEvidence": "Not observed: no GPT-5.6 key in upstream metering maps; name-based guess, shown only if Copilot ever reports it"
+  },
+  {
+    "tone": "Gpt_5_5_Reasoning",
+    "label": "GPT-5.5",
+    "menuLabel": "GPT-5.5 · Think deeper",
+    "badge": "5.5",
+    "budgetPrefix": "GPT55Query",
+    "knownPaidCap": false,
+    "budgetEvidence": "Not observed: upstream GPT-5.5 turns lowered no metered budget; name-based guess, shown only if Copilot ever reports it"
+  },
+  {
+    "tone": "Magic",
+    "label": "Auto",
+    "menuLabel": "Auto",
+    "badge": "A",
+    "budgetPrefix": null,
+    "knownPaidCap": false,
+    "budgetEvidence": "None: a budget cannot be attributed to Auto's unknown backend choice"
+  }
+]

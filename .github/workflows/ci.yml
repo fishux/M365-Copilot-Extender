@@ -1,0 +1,37 @@
+name: CI
+
+# Pushes to a pull request's branch run through `pull_request`; `push` covers main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Check, test and typecheck (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      # Dev-only: TypeScript and Chrome types for the typecheck. Nothing is shipped.
+      - run: npm ci
+      # Fails if extension/ bundles or generated model tables are stale, versions
+      # disagree, or the manifest's permissions or scope change.
+      - run: npm run check
+      - run: npm test
+      - run: npm run typecheck

@@ -1,4 +1,4 @@
-const fixtureSocket = new WebSocket('wss://substrate.office.com/m365Copilot/Chathub/fixture?scenario=OfficeWebPaidCopilot');
+const fixtureSocket = new WebSocket('wss://substrate.office.com/m365Copilot/Chathub/fixture?scenario=OfficeWebPaidCopilot&ConversationId=0f0e0d0c-0b0a-4908-8706-050403020100');
 window.simulateReply = (daily = 32, weekly = 58, absent = false) => {
   fixtureSocket.send(JSON.stringify({ type: 4, target: 'chat', arguments: [{ tone: 'Magic', message: { text: 'Fixture' } }] }) + '\x1e');
   fixtureSocket.receive({ type: 2, item: {

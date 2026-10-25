@@ -10,6 +10,7 @@ output = root / 'outputs' / f'M365-Copilot-Extender-v{version}.zip'
 output.parent.mkdir(exist_ok=True)
 with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
     for file in sorted(extension.rglob('*')):
-        if file.is_file():
+        # Skip hidden files such as .DS_Store that Finder may add.
+        if file.is_file() and not any(part.startswith('.') for part in file.relative_to(extension).parts):
             archive.write(file, file.relative_to(extension))
 print(output)
