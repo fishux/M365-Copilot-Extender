@@ -25,7 +25,7 @@ document.getElementById('checks').addEventListener('click', async () => {
     copilot.simulateReply(0, 0); await pause(1600);
     check(popupRoot.querySelector('.daily').textContent === '0', 'Zero quota stays visible');
     check(popupRoot.querySelector('.status-text').textContent.includes('usage limit'), 'Quota refusal is surfaced');
-    check(!popupRoot.querySelector('.out-of-credits').hidden && popupRoot.querySelectorAll('.fallbacks button').length === 5, 'Out of credits offers one-click pins');
+    check(!popupRoot.querySelector('.copy, .copy-all, .out-of-credits'), 'No copy buttons or out-of-credits pins');
     copilot.simulateReply(30, 50, true); await pause(1600);
     check(popupRoot.querySelector('.daily').textContent === '0' && !popupRoot.querySelector('.counts').hidden, 'Missing quota preserves last reported allowance');
     check(popupRoot.querySelector('.capacity-count').textContent === '4 / 600 messages', 'Conversation capacity is visible');

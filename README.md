@@ -50,7 +50,7 @@ Counters show **remaining messages** reported by Copilot, refreshed after a resp
 - Allowances are per account, so they stay visible when you switch to another conversation in the same tab.
 - Readings are kept **in memory in each tab**. The popup reads the active Copilot tab; opening it on another website still lets you change preferences, but shows no connection data. Send a message in a new or reloaded Copilot tab to obtain its readings. Old readings are marked **Last known** after five minutes; they refresh only with a new response.
 
-The status line at the top of the popup shows whether your preference was applied to the last request, or the last error. The **details** drawer shows the observed scenario, the last requested model, result code, and known content origin, each with a copy button; **copy all** copies only those fields, never conversation IDs. If a request reaches a usage limit, the popup offers one-click buttons to pin another model to the chat; it never switches automatically.
+The status line at the top of the popup shows whether your preference was applied to the last request, or the last error. The **details** drawer shows the observed scenario, the last requested model, result code, and known content origin. If a request reaches a usage limit, the status line says so; the popup never switches models automatically.
 
 ## Conversation capacity and expiry
 
@@ -63,7 +63,7 @@ These readings belong to the conversation shown in the page. Each conversation k
 
 ## Per-conversation model
 
-Each model row has a pin button that pins that model to the chat you're viewing. Click the filled pin again, or **unpin** in the chat section, to return the chat to the default. The choice applies to every later turn in that conversation, in any tab, and survives restarts; other conversations keep using the default.
+Each model row has a pin button that pins that model to the chat you're viewing. Click the filled pin again, or **unpin** in the chat section, to return the chat to the default. The default and the pin are separate settings: clicking a row while the chat is pinned changes the default for other conversations, and this chat keeps its pinned model. The choice applies to every later turn in that conversation, in any tab, and survives restarts; other conversations keep using the default.
 
 - Pins become available once the conversation has an ID: after its first message is sent, or when you open an existing chat from the sidebar.
 - Conversations are identified by the `ConversationId` that Copilot's own client attaches to its Chathub connection (and shows in `/chat/conversation/<id>` URLs). Only a SHA-256 hash of that ID is saved, together with the model and a timestamp; the 200 most recent choices are kept.
