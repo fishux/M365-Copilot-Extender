@@ -11,7 +11,7 @@
   const DEFAULT_ICON = { 16: "icons/icon16.png", 32: "icons/icon32.png" };
   /** @type {Partial<Record<"warn" | "critical", Record<number, ImageData>>>} */
   const icons = {};
-  let defaultTone = core.DEFAULT_TONE;
+  const defaultTone = core.DEFAULT_TONE;
 
   /** @param {"warn" | "critical"} level @param {number} size */
   function drawIcon(level, size) {
@@ -47,8 +47,7 @@
     return { text: model?.badge ?? "", color: BADGE_COLORS[level], level, title: `${TITLE} — ${model?.label ?? "Unknown"}${left}` };
   }
 
-  async function applyDefault(tone) {
-    defaultTone = core.modelFor(tone)?.tone || core.DEFAULT_TONE;
+  async function applyDefault() {
     const view = badgeView(defaultTone, null);
     await Promise.all([
       chrome.action.setBadgeText({ text: view.text }),
@@ -88,8 +87,6 @@
   chrome.tabs.onUpdated.addListener((tabId, info) => {
     if (info.status === "loading") resetTab(tabId).catch(() => { /* Tab closed. */ });
   });
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.selectedTone) applyDefault(changes.selectedTone.newValue).catch(() => {});
-  });
-  chrome.storage.local.get(["selectedTone"]).then(settings => applyDefault(settings.selectedTone)).catch(() => applyDefault(null).catch(() => {}));
+  // The default model is fixed in models.json; per-chat selections arrive from tabs.
+  applyDefault().catch(() => {});
 })();

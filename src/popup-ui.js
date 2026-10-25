@@ -31,16 +31,13 @@
     .model-row { display:flex; align-items:center; border-radius:4px; }
     .model-row:hover { background:var(--hover); } .model-row.active { background:var(--current); }
     .pick { flex:1; min-width:0; display:flex; align-items:center; height:32px; padding:0 6px; border:0; background:none; text-align:left; cursor:pointer; font-size:13px; }
-    .pick:disabled { cursor:wait; }
+    .pick:disabled { cursor:default; } .models.locked .model-row:not(.active) { opacity:.6; }
+    .models.locked .model-row:hover { background:none; } .models.locked .model-row.active:hover { background:var(--current); }
+    .mark { width:14px; flex:none; color:var(--good); }
     .badge { width:48px; flex:none; color:var(--accent); } .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .tag { color:var(--muted); font-size:11px; } .tag.pinned { color:var(--low); }
-    .pin { width:32px; height:32px; flex:none; display:grid; place-items:center; border:0; border-radius:4px; background:none; color:var(--muted); cursor:pointer; opacity:.45; }
-    .model-row:hover .pin, .pin:focus-visible, .pin[aria-pressed="true"] { opacity:1; }
-    .pin:hover:not(:disabled) { background:var(--current); } .pin[aria-pressed="true"] { color:var(--low); }
-    .pin:disabled { cursor:default; opacity:.2; }
-    .pin svg { width:15px; height:15px; } .pin[aria-pressed="true"] path { fill:currentColor; }
+    .tag { color:var(--muted); font-size:11px; } .tag.selected { color:var(--low); }
     .chip { height:24px; padding:0 8px; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer; font-size:11px; }
-    .chip:hover { background:var(--hover); } .unpin { margin-left:auto; color:var(--low); }
+    .chip:hover { background:var(--hover); }
     .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit { color:var(--low); }
     .capacity-track { width:80px; height:8px; margin-right:8px; flex:none; border-radius:2px; background:var(--soft); overflow:hidden; position:relative; }
     .capacity-track::after { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 7px,var(--bg) 7px 8px); }
@@ -61,11 +58,10 @@
       --good:#7ee787; --low:#f2cc60; --critical:#ff7b72; --accent:#79c0ff; --hover:#161e29; --current:#1f2937; --warn-bg:#19160d; --warn-line:#5c4a17; } }
     @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
   `;
-  const pinIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.6 1.8l4.6 4.6-1.6 1.1-.9-.4-2.6 2.6.4 3-1.2 1.2-2.6-2.6-3.2 3.2-.9-.9 3.2-3.2-2.6-2.6 1.2-1.2 3 .4 2.6-2.6-.4-.9z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
   const levelTag = { normal: "[ok]", warn: "[low]", critical: "[crit]" };
   const levelClass = { normal: "ok", warn: "low", critical: "critical" };
 
-  function mount(host, { onSelect, onConversationSelect }) {
+  function mount(host, { onConversationSelect }) {
     const root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style"); style.textContent = css; root.append(style);
     const card = document.createElement("section");
@@ -81,10 +77,10 @@
       <div class="line"><span class="key">weekly</span><span class="number weekly">—</span><span class="level weekly-level"></span></div></div>
       <p class="note pending" hidden>Send a message to check your allowance.</p></section>
       <p class="warning box" hidden></p>
-      <section aria-label="Models"><h2 class="heading"><span># model</span><span>click = default · pin = this chat</span></h2>
-      <div class="models" role="group" aria-label="Default model"></div></section>
+      <section aria-label="Models"><h2 class="heading"><span># model · this chat</span><span class="models-hint"></span></h2>
+      <div class="models" role="radiogroup" aria-label="Model for this chat"></div></section>
       <section class="conversation-info" aria-label="This conversation" hidden><h2 class="heading"># chat</h2>
-      <div class="line"><span class="key">model</span><span class="chat-model">Send a message to pin a model</span><button type="button" class="chip unpin" hidden>unpin</button></div>
+      <div class="line"><span class="key">model</span><span class="chat-model"></span></div>
       <div class="line"><span class="key">capacity</span><span class="capacity-track" role="meter" aria-label="Conversation messages used" aria-valuemin="0" hidden><span class="capacity-fill"></span></span><span class="capacity-count">Awaiting reply</span></div>
       <div class="line"><span class="key">expiry</span><time class="expiry-value" tabindex="0">Not reported</time></div></section>
       <section class="no-tab" hidden><p class="note">Readings come from the active Copilot tab.</p></section>
@@ -99,25 +95,22 @@
     root.append(card);
     /** @type {(selector: string) => HTMLElement} */
     const find = selector => /** @type {HTMLElement} */ (card.querySelector(selector));
-    /** @type {{ tone: string, row: HTMLElement, pick: HTMLButtonElement, tag: HTMLElement, pin: HTMLButtonElement }[]} */
+    /** @type {{ tone: string, row: HTMLElement, pick: HTMLButtonElement, mark: HTMLElement, tag: HTMLElement }[]} */
     const rows = [];
-    let current = { tone: "", conversationTone: /** @type {string | null} */ (null) };
     for (const model of core.MODELS) {
       const row = document.createElement("div"); row.className = "model-row"; row.dataset.tone = model.tone;
-      const pick = document.createElement("button"); pick.type = "button"; pick.className = "pick";
+      const pick = document.createElement("button"); pick.type = "button"; pick.className = "pick"; pick.setAttribute("role", "radio");
+      const mark = document.createElement("span"); mark.className = "mark"; mark.setAttribute("aria-hidden", "true");
       const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = `[${model.badge}]`;
       const name = document.createElement("span"); name.className = "name"; name.textContent = model.menuLabel;
       const tag = document.createElement("span"); tag.className = "tag";
-      pick.append(badge, name, tag);
-      pick.addEventListener("click", () => onSelect(model.tone));
-      const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin"; pin.innerHTML = pinIcon;
-      // Clicking the pinned model's pin again returns this chat to the default.
-      pin.addEventListener("click", () => onConversationSelect(current.conversationTone === model.tone ? null : model.tone));
-      row.append(pick, pin);
+      pick.append(mark, badge, name, tag);
+      // Choosing a model keeps this chat on it until another is chosen.
+      pick.addEventListener("click", () => onConversationSelect(model.tone));
+      row.append(pick);
       find(".models").append(row);
-      rows.push({ tone: model.tone, row, pick, tag, pin });
+      rows.push({ tone: model.tone, row, pick, mark, tag });
     }
-    find(".unpin").addEventListener("click", () => onConversationSelect(null));
     const toggle = find(".toggle");
     toggle.addEventListener("click", () => {
       const open = toggle.getAttribute("aria-expanded") !== "true";
@@ -130,34 +123,32 @@
     function update(state) {
       const observed = state.observed || {};
       const connected = state.connected !== false;
-      // A per-conversation choice overrides the default for this chat.
+      // A chat's own selection overrides the default; new chats start on the default.
       const tone = state.conversationTone || state.tone;
-      current = { tone: state.tone, conversationTone: state.conversationTone };
-      const busy = !state.loaded || state.saving;
-      for (const { tone: rowTone, row, pick, tag, pin } of rows) {
+      const locked = !state.loaded || state.saving || !state.conversation;
+      find(".models").classList.toggle("locked", locked);
+      find(".models-hint").textContent = state.conversation ? "click to switch" : connected ? "new chat: send a message first" : "open a chat to switch";
+      for (const { tone: rowTone, row, pick, mark, tag } of rows) {
         const model = core.modelFor(rowTone);
-        const isDefault = rowTone === state.tone, isPinned = rowTone === state.conversationTone;
-        row.classList.toggle("active", rowTone === tone);
-        pick.disabled = busy;
-        pick.setAttribute("aria-pressed", String(isDefault));
-        pick.setAttribute("aria-label", `${model?.label}${isDefault ? ", default" : ""}${isPinned ? ", pinned to this chat" : ""}`);
-        tag.textContent = isDefault && isPinned ? "default · pinned" : isPinned ? "pinned" : isDefault ? "default" : "";
-        tag.classList.toggle("pinned", isPinned);
-        pin.hidden = !connected;
-        pin.disabled = busy || !state.conversation;
-        pin.setAttribute("aria-pressed", String(isPinned));
-        const pinLabel = !state.conversation ? "Send a message to pin a model to this chat"
-          : isPinned ? `Unpin ${model?.label} from this chat` : `Pin ${model?.label} to this chat`;
-        pin.setAttribute("aria-label", pinLabel); pin.title = pinLabel;
+        const isDefault = rowTone === state.tone, isActive = rowTone === tone;
+        row.classList.toggle("active", isActive);
+        mark.textContent = isActive ? "›" : "";
+        pick.disabled = locked;
+        pick.setAttribute("aria-checked", String(isActive));
+        pick.setAttribute("aria-label", `${model?.label}${isDefault ? ", default" : ""}`);
+        pick.title = state.conversation ? `Use ${model?.label} in this chat from now on` : "Send a message in a chat to choose its model";
+        tag.textContent = isDefault ? "default" : isActive ? "this chat" : "";
+        tag.classList.toggle("selected", isActive && !isDefault);
       }
-      find(".save-label").textContent = state.saving ? "Saving…" : state.loaded ? "Saved across tabs & restarts" : "Loading saved preference…";
+      find(".save-label").textContent = state.saving ? "Saving…" : state.loaded ? "Saved per chat · all tabs" : "Loading saved choices…";
       find(".error").hidden = !state.error;
       find(".error").textContent = state.error || "";
 
       const quota = core.allowanceFor(tone, observed.metering);
       const model = core.modelFor(tone);
       const knownPaidCap = model?.knownPaidCap && observed.scenario !== "OfficeWebIncludedCopilot";
-      find(".usage").hidden = !connected || !(quota || knownPaidCap);
+      // Allowances are saved across tabs, so they show even outside Copilot.
+      find(".usage").hidden = !(quota || (connected && knownPaidCap));
       find(".usage-title").textContent = `# allowance · ${model?.label ?? "—"}`;
       find(".counts").hidden = !quota;
       find(".pending").hidden = Boolean(quota);
@@ -177,10 +168,15 @@
         find(`.${period}-level`).className = `level ${period}-level ${known ? levelClass[level] : ""}`;
       }
 
-      let text = connected ? "Ready for your next message" : "No Copilot tab · preferences can still be changed";
+      let text = connected ? "Ready for your next message" : "No Copilot tab";
       let status = "";
       if (connected && !state.hookReady) text = "Connecting to Copilot…";
-      if (observed.appliedTone === tone) { text = "Preference applied to the last request"; status = "good"; }
+      const applied = core.modelFor(observed.appliedTone);
+      if (connected && applied) {
+        text = `Last request sent via ${applied.label}`;
+        if (applied.tone !== tone) text += ` · next: ${model?.label}`;
+        status = "good";
+      }
       if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "critical"; }
       else if (observed.result && observed.result !== "Success") { text = `Copilot response: ${observed.result}`; status = "warn"; }
       find(".status-text").textContent = text;
@@ -199,10 +195,7 @@
       find(".no-tab").hidden = connected;
       find(".open-copilot").hidden = connected;
       find(".conversation-info").hidden = !connected;
-      const defaultLabel = core.modelFor(state.tone)?.label ?? "—";
-      find(".chat-model").textContent = !state.conversation ? `default → ${defaultLabel}`
-        : state.conversationTone ? `pinned → ${core.modelFor(state.conversationTone)?.label}` : `default → ${defaultLabel}`;
-      find(".unpin").hidden = !state.conversationTone || !state.conversation;
+      find(".chat-model").textContent = `${model?.label ?? "—"} (${state.conversationTone ? "selected" : "default"})`;
       const conversation = core.conversationView(observed.conversation, observed.expiresAt);
       find(".capacity-count").textContent = conversation.capacity;
       find(".capacity-count").title = conversation.capacityTitle;

@@ -45,15 +45,15 @@ test('endpoint scoping excludes unrelated sockets and strips credentials', () =>
 test('reads zero allowances and rejects missing, negative, non-finite and string values', () => {
   const metering = core.parseMetering({ GPT61SolQueryDaily: { remainingAllowance: 0 }, GPT61SolQueryWeekly: { remainingAllowance: 12 }, Invalid: { remainingAllowance: -1 }, NaN: { remainingAllowance: NaN }, String: { remainingAllowance: '40' } });
   assert.deepEqual(clone(metering), { GPT61SolQueryDaily: 0, GPT61SolQueryWeekly: 12 });
-  assert.deepEqual(clone(core.allowanceFor(core.DEFAULT_TONE, metering)), { daily: 0, weekly: 12 });
+  assert.deepEqual(clone(core.allowanceFor('Gpt_61_Sol_Reasoning', metering)), { daily: 0, weekly: 12 });
   assert.equal(core.allowanceFor('Gpt_6_Sol_Reasoning', metering), null);
   assert.equal(core.allowanceFor('Magic', metering), null);
-  assert.equal(core.allowanceFor(core.DEFAULT_TONE, {}), null);
+  assert.equal(core.allowanceFor('Gpt_61_Sol_Reasoning', {}), null);
 });
 test('only associates unambiguous model-specific Daily/Weekly keys when observed', () => {
   assert.deepEqual(clone(core.allowanceFor('Gpt_6_Sol_Reasoning', { GPT6SolQueryDaily: 9 })), { daily: 9, weekly: null });
   assert.equal(core.allowanceFor('Gpt_6_Reasoning', { GPT61SolQueryDaily: 9 }), null);
-  assert.equal(core.allowanceFor(core.DEFAULT_TONE, { ClaudeOpusQueryDaily: 40 }), null);
+  assert.equal(core.allowanceFor('Gpt_61_Sol_Reasoning', { ClaudeOpusQueryDaily: 40 }), null);
 });
 test('reads quota and refusals from final type 2 and streaming type 1, without leaking text', () => {
   const item = { throttling: { metering: { GPT61SolQueryWeekly: { remainingAllowance: 0 } }, numUserMessagesInConversation: 3, maxNumUserMessagesInConversation: 600 }, result: { value: 'OutOfCredits', message: 'PRIVATE REFUSAL' }, messages: [{ author: 'bot', contentOrigin: 'BotConnection', text: 'PRIVATE REPLY' }] };

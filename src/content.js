@@ -5,8 +5,10 @@
   const core = globalThis.M365ExtenderCore;
   const CHANNEL = "m365-copilot-extender-v1";
   const MAX_SLOTS = 50;
-  /** @type {{ tone: string, loaded: boolean, failed: boolean, hookReady: boolean, conversationTones: ConversationTones, tabWarning?: string }} */
-  const state = { tone: core.DEFAULT_TONE, loaded: false, failed: false, hookReady: false, conversationTones: {} };
+  // Streaming replies update readings many times; save them at most this often.
+  const PERSIST_DELAY = 250;
+  /** @type {{ loaded: boolean, failed: boolean, hookReady: boolean, conversationTones: ConversationTones, readings: ConversationReadings, tabWarning?: string }} */
+  const state = { loaded: false, failed: false, hookReady: false, conversationTones: {}, readings: {} };
   const warnings = {
     "settings-unavailable": "Preference was not ready; this request used Copilot’s setting.",
     "conversation-unavailable": "This conversation’s model was not ready; the default model was used.",
@@ -19,10 +21,12 @@
   const pendingSendWarnings = new Set(["settings-unavailable", "conversation-unavailable", "connection-closed", "send-failed"]);
 
   // Account-wide readings: allowances belong to the account, not a conversation.
+  // Allowances are mirrored to storage so every tab shows the last reported value.
   /** @type {{ metering?: Record<string, number>, quotaAt?: number, scenario?: string }} */
   const account = {};
   // Per-conversation readings, keyed by ConversationId, or "socket:<n>" when a
-  // connection carries no conversation ID. Tab-local and never persisted.
+  // connection carries no conversation ID. Conversations are also saved under
+  // their hashed key so another tab, or a restart, shows the last reply.
   /** @type {Map<string, Observed>} */
   const slots = new Map();
   const sentSlots = new Set();
@@ -30,14 +34,17 @@
   /** @type {Map<string, string>} conversationId -> hashed storage key */
   const keys = new Map();
   const hashing = new Set();
+  /** Conversations whose readings changed and still need saving. */
+  const dirty = new Set();
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let persistTimer = null;
   /** @type {string | null} */
   let activeSlot = null;
-  let preferenceRevision = 0;
-  let conversationRevision = 0;
+  const revisions = { conversationTones: 0, usage: 0, conversationReadings: 0 };
   let lastPublished = "";
 
   const post = data => window.postMessage({ channel: CHANNEL, direction: "to-page", ...data }, location.origin);
-  const configure = () => post({ kind: "configure", tone: state.loaded ? state.tone : null });
+  const configure = () => post({ kind: "configure", tone: state.loaded ? core.DEFAULT_TONE : null });
   const slotName = message => core.safeConversationId(message.conversationId) || `socket:${Number(message.socketId) || 0}`;
   const isConversation = name => typeof name === "string" && !name.startsWith("socket:");
 
@@ -54,6 +61,45 @@
     return observed;
   }
 
+  /** Keep only the newest entries of a saved per-conversation map. */
+  const newest = entries => Object.fromEntries(Object.entries(entries)
+    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS));
+
+  function touch(name) {
+    const observed = slot(name);
+    observed.at = Date.now();
+    if (!isConversation(name)) return;
+    dirty.add(name);
+    persistTimer ??= setTimeout(persist, PERSIST_DELAY);
+  }
+
+  function persist() {
+    persistTimer = null;
+    if (state.failed) return;
+    // Wait for the initial read so saved readings from other chats are kept.
+    if (!state.loaded) { persistTimer = setTimeout(persist, PERSIST_DELAY); return; }
+    const next = { ...state.readings };
+    let changed = false;
+    for (const id of [...dirty]) {
+      const key = keys.get(id), observed = slots.get(id);
+      if (!key) continue; // Saved once hashing finishes.
+      dirty.delete(id);
+      if (!observed) continue;
+      // Warnings describe this tab's connection; they are not saved.
+      const { warning, ...saved } = observed;
+      next[key] = { ...saved, at: observed.at || Date.now() };
+      changed = true;
+    }
+    if (!changed) return;
+    state.readings = newest(next);
+    chrome.storage.local.set({ conversationReadings: state.readings }).catch(() => { /* Readings stay in this tab. */ });
+  }
+
+  function saveUsage() {
+    if (state.failed || !account.metering || !account.quotaAt) return;
+    chrome.storage.local.set({ usage: { metering: account.metering, quotaAt: account.quotaAt } }).catch(() => { /* Tab keeps its reading. */ });
+  }
+
   // Conversation IDs are hashed before they touch storage or the popup, so
   // saved per-conversation choices cannot be matched to server records.
   async function keyFor(id) {
@@ -67,6 +113,7 @@
     keyFor(id).then(key => {
       keys.set(id, key);
       answerHook(id);
+      if (dirty.has(id)) persistTimer ??= setTimeout(persist, PERSIST_DELAY);
       publishTab();
     }).catch(() => { /* Without a key this conversation uses the default model. */ })
       .finally(() => hashing.delete(id));
@@ -100,14 +147,20 @@
 
   function effectiveTone(name) {
     const key = isConversation(name) ? keys.get(name) : undefined;
-    return (key && state.conversationTones[key]?.tone) || state.tone;
+    return (key && state.conversationTones[key]?.tone) || core.DEFAULT_TONE;
   }
 
   function snapshot() {
     const name = currentSlot();
-    const observed = { ...account, ...(name ? slots.get(name) : {}) };
-    observed.warning = observed.warning || state.tabWarning;
     const key = isConversation(name) ? keys.get(/** @type {string} */ (name)) : undefined;
+    const live = name ? slots.get(name) : undefined;
+    const saved = key ? state.readings[key] : undefined;
+    // The newer of this tab's readings and the saved ones (possibly from another tab).
+    const readings = saved && (saved.at || 0) >= (live?.at || 0) ? saved : live;
+    const observed = { ...account, ...readings };
+    delete observed.at;
+    observed.warning = live?.warning || state.tabWarning;
+    if (!observed.warning) delete observed.warning;
     return { hookReady: state.hookReady, observed, conversation: key ? { key } : null };
   }
 
@@ -141,7 +194,7 @@
       activeSlot = name;
       sentSlots.add(name);
       const observed = slot(name);
-      if (message.kind === "applied") observed.appliedTone = core.modelFor(message.tone)?.tone;
+      if (message.kind === "applied") { observed.appliedTone = core.modelFor(message.tone)?.tone; touch(name); }
       account.scenario = core.safeScenario(message.scenario);
       if (state.loaded) delete observed.warning;
     } else if (message.kind === "warning" && warnings[message.code]) {
@@ -159,11 +212,11 @@
       if (name === activeSlot) {
         account.scenario = core.safeScenario(message.scenario);
         if (message.metering && typeof message.metering === "object") {
-          // Revalidate data from the page, which is not an authenticated boundary.
-          const metering = core.parseMetering(Object.fromEntries(Object.entries(message.metering).map(([key, value]) => [key, { remainingAllowance: value }])));
+          const metering = validMetering(message.metering);
           if (Object.keys(metering).length) {
             account.metering = { ...account.metering, ...metering };
             account.quotaAt = Date.now();
+            saveUsage();
           }
         }
       }
@@ -172,9 +225,14 @@
       if (core.count(message.conversation?.used) !== null && core.count(message.conversation?.limit) !== null) observed.conversation = { used: message.conversation.used, limit: message.conversation.limit };
       const expiresAt = core.parseExpiry(message.expiresAt);
       if (expiresAt) observed.expiresAt = expiresAt;
+      touch(name);
     } else return;
     publishTab();
   });
+
+  // Revalidate data from the page or storage, neither of which is an authenticated boundary.
+  const validMetering = raw => core.parseMetering(Object.fromEntries(Object.entries(raw && typeof raw === "object" ? raw : {})
+    .map(([key, value]) => [key, { remainingAllowance: value }])));
 
   /** @returns {ConversationTones} */
   function validTones(raw) {
@@ -187,6 +245,36 @@
     return valid;
   }
 
+  /** @returns {ConversationReadings} */
+  function validReadings(raw) {
+    /** @type {ConversationReadings} */
+    const valid = {};
+    if (!raw || typeof raw !== "object") return valid;
+    for (const [key, entry] of Object.entries(raw)) {
+      if (!/^[0-9a-f]{32}$/.test(key) || !entry || typeof entry !== "object") continue;
+      /** @type {Observed & { at: number }} */
+      const reading = { at: Number(entry.at) || 0 };
+      const applied = core.modelFor(entry.appliedTone);
+      if (applied) reading.appliedTone = applied.tone;
+      if (core.allowedResults.includes(entry.result)) reading.result = entry.result;
+      if (core.allowedOrigins.includes(entry.origin)) reading.origin = entry.origin;
+      const used = core.count(entry.conversation?.used), limit = core.count(entry.conversation?.limit);
+      if (used !== null && limit !== null) reading.conversation = { used, limit };
+      const expiresAt = core.parseExpiry(entry.expiresAt);
+      if (expiresAt) reading.expiresAt = expiresAt;
+      valid[key] = reading;
+    }
+    return valid;
+  }
+
+  function applyUsage(raw) {
+    const quotaAt = Number(raw?.quotaAt) || 0;
+    // Keep this tab's reading if it is newer than what was saved.
+    if (!quotaAt || quotaAt < (account.quotaAt || 0)) return;
+    account.metering = validMetering(raw.metering);
+    account.quotaAt = quotaAt;
+  }
+
   function applyConversationTones(raw) {
     state.conversationTones = validTones(raw);
     for (const id of keys.keys()) answerHook(id);
@@ -194,12 +282,10 @@
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    if (changes.selectedTone) {
-      preferenceRevision++;
-      state.tone = core.modelFor(changes.selectedTone.newValue)?.tone || core.DEFAULT_TONE;
-      if (state.loaded) configure();
-    }
-    if (changes.conversationTones) { conversationRevision++; applyConversationTones(changes.conversationTones.newValue); }
+    for (const key of Object.keys(revisions)) if (changes[key]) revisions[key]++;
+    if (changes.conversationTones) applyConversationTones(changes.conversationTones.newValue);
+    if (changes.usage) applyUsage(changes.usage.newValue);
+    if (changes.conversationReadings) state.readings = validReadings(changes.conversationReadings.newValue);
     publishTab();
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
@@ -213,11 +299,14 @@
   try { /** @type {any} */ (window).navigation?.addEventListener("currententrychange", republish); } catch { /* Older Chrome. */ }
   window.addEventListener("pageshow", republish);
 
-  const initialRevision = preferenceRevision, initialConversationRevision = conversationRevision;
-  chrome.storage.local.get(["selectedTone", "conversationTones"]).then(settings => {
-    if (preferenceRevision === initialRevision) state.tone = core.modelFor(settings.selectedTone)?.tone || core.DEFAULT_TONE;
+  const initialRevisions = { ...revisions };
+  chrome.storage.local.get(Object.keys(revisions)).then(settings => {
+    // A cross-tab change that arrived during this read is newer; keep it.
+    const fresh = key => revisions[key] === initialRevisions[key];
+    if (fresh("conversationTones")) state.conversationTones = validTones(settings.conversationTones);
+    if (fresh("usage")) applyUsage(settings.usage);
+    if (fresh("conversationReadings")) state.readings = validReadings(settings.conversationReadings);
     state.loaded = true;
-    if (conversationRevision === initialConversationRevision) state.conversationTones = validTones(settings.conversationTones);
     configure();
     for (const id of keys.keys()) answerHook(id);
     publishTab();

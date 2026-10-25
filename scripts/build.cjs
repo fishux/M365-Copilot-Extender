@@ -23,6 +23,8 @@ for (const model of models) {
   if (model.badge.length > 4) throw new Error(`models.json: ${model.tone} badge must be at most 4 characters`);
 }
 if (new Set(models.map(model => model.tone.toLowerCase())).size !== models.length) throw new Error('models.json: duplicate tone');
+if (models.filter(model => model.default === true).length !== 1) throw new Error('models.json: exactly one model needs "default": true');
+if (models.some(model => 'default' in model && typeof model.default !== 'boolean')) throw new Error('models.json: "default" must be a boolean');
 
 const entries = { 'page-hook.js': [], 'content.js': [], 'popup.js': ['popup-ui.js'], 'background.js': [] };
 const outputs = {};
@@ -40,7 +42,7 @@ function replaceBlock(file, marker, content) {
   return source.replace(pattern, (_, start, end) => start + content + end);
 }
 outputs['README.md'] = replaceBlock('README.md', 'models', table(['Selection', 'Badge', 'Requested tone'],
-  models.map(model => [model.menuLabel, `\`${model.badge}\``, code(model.tone)])));
+  models.map(model => [model.default ? `${model.menuLabel} (default)` : model.menuLabel, `\`${model.badge}\``, code(model.tone)])));
 outputs[path.join('docs', 'architecture.md')] = replaceBlock('docs/architecture.md', 'budgets', table(['Selected model', 'Budget prefix', 'Evidence'],
   models.map(model => [model.label, code(model.budgetPrefix), model.budgetEvidence])));
 

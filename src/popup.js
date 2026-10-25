@@ -2,17 +2,19 @@
 (() => {
   "use strict";
   const core = globalThis.M365ExtenderCore;
-  // Oldest per-conversation choices are dropped beyond this many.
-  const MAX_CONVERSATION_TONES = 200;
+  // The default model is fixed in models.json; only per-chat choices are saved.
   const state = { tone: core.DEFAULT_TONE, loaded: false, saving: false,
     connected: false, hookReady: false, error: "", observed: {},
     /** @type {{ key: string } | null} */ conversation: null,
     /** @type {string | null} */ conversationTone: null };
   /** @type {ConversationTones} */
   let conversationTones = {};
-  const revisions = { selectedTone: 0, conversationTones: 0 };
+  /** Last allowances reported in any tab. @type {Usage | null} */
+  let usage = null;
+  /** @type {any} */
+  let tabObserved = {};
+  const revisions = { conversationTones: 0, usage: 0 };
   const panel = globalThis.M365ExtenderPanel.mount(/** @type {HTMLElement} */ (document.getElementById("panel")), {
-    onSelect: tone => save({ selectedTone: tone }),
     onConversationSelect: tone => saveConversation(tone)
   });
   const render = () => panel.update(state);
@@ -24,25 +26,42 @@
     } catch { state.error = "Could not save changes. Please try again."; }
     finally { state.saving = false; render(); }
   }
-  /** @param {string | null} tone */
+  /**
+   * Choosing a model in a chat keeps that chat on it from then on. Choosing the
+   * default model removes the entry, so the chat follows the default again.
+   * @param {string | null} tone
+   */
   function saveConversation(tone) {
     const key = state.conversation?.key;
     if (!key) return;
     const model = core.modelFor(tone);
     const next = { ...conversationTones };
-    if (model) next[key] = { tone: model.tone, at: Date.now() };
+    if (model && model.tone !== core.DEFAULT_TONE) next[key] = { tone: model.tone, at: Date.now() };
     else delete next[key];
-    const recent = Object.entries(next).sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, MAX_CONVERSATION_TONES);
+    const recent = Object.entries(next).sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS);
     return save({ conversationTones: Object.fromEntries(recent) });
   }
   function refreshConversation() {
     const key = state.conversation?.key;
     state.conversationTone = (key && core.modelFor(conversationTones[key]?.tone)?.tone) || null;
   }
+  /** Tab readings, with allowances from storage when they are newer (or the tab has none). */
+  function refreshObserved() {
+    const observed = { ...tabObserved };
+    if (usage && usage.quotaAt > (Number(observed.quotaAt) || 0)) {
+      observed.metering = usage.metering; observed.quotaAt = usage.quotaAt;
+    }
+    state.observed = observed;
+  }
   function applySettings(settings) {
-    if ("selectedTone" in settings) state.tone = core.modelFor(settings.selectedTone)?.tone || core.DEFAULT_TONE;
     if ("conversationTones" in settings) conversationTones = settings.conversationTones && typeof settings.conversationTones === "object" ? settings.conversationTones : {};
+    if ("usage" in settings) {
+      const value = settings.usage;
+      usage = value && typeof value === "object" && Number(value.quotaAt) > 0 && value.metering && typeof value.metering === "object"
+        ? { metering: value.metering, quotaAt: Number(value.quotaAt) } : null;
+    }
     refreshConversation();
+    refreshObserved();
   }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
@@ -64,10 +83,11 @@
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const snapshot = await chrome.tabs.sendMessage(/** @type {number} */ (tab.id), { type: "M365_EXTENDER_SNAPSHOT" });
       state.connected = true; state.hookReady = snapshot.hookReady;
-      state.observed = snapshot.observed || {};
+      tabObserved = snapshot.observed || {};
       state.conversation = typeof snapshot.conversation?.key === "string" ? { key: snapshot.conversation.key } : null;
-    } catch { state.connected = false; state.hookReady = false; state.observed = {}; state.conversation = null; }
+    } catch { state.connected = false; state.hookReady = false; tabObserved = {}; state.conversation = null; }
     refreshConversation();
+    refreshObserved();
     render();
   }
   readTab();

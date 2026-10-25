@@ -28,12 +28,12 @@ function worker(store = createStore()) {
   return { calls, listeners, send, last, store };
 }
 
-test('global badge shows the default model and follows preference changes', async () => {
+test('global badge shows the fixed default model and ignores a legacy saved default', async () => {
   const env = worker(createStore({ selectedTone: 'Gpt_5_6_Reasoning' })); await settle();
-  assert.equal(env.last('setBadgeText').text, '5.6');
-  assert.match(env.last('setTitle').title, /Default: GPT-5\.6/);
+  assert.equal(env.last('setBadgeText').text, '6S');
+  assert.match(env.last('setTitle').title, /Default: GPT-6 Sol/);
   await env.store.chrome.storage.local.set({ selectedTone: 'Magic' }); await settle();
-  assert.equal(env.last('setBadgeText').text, 'A');
+  assert.equal(env.last('setBadgeText').text, '6S');
 });
 
 test('tab badge colour and icon turn orange at 20 and red at 10 or below', async () => {

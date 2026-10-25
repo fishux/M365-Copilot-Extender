@@ -2,11 +2,13 @@
 /* Shared, dependency-free protocol helpers. */
 (() => {
   "use strict";
-  // The model list lives in src/models.json; the build inlines it. The first
-  // entry is the initial default.
+  // The model list lives in src/models.json; the build inlines it. The entry
+  // marked "default" is the fixed default for every chat without a selection.
   /** @type {readonly Model[]} */
   const MODELS = Object.freeze(globalThis.M365ExtenderModels.map(model => Object.freeze({ ...model })));
-  const DEFAULT_TONE = MODELS[0].tone;
+  const DEFAULT_TONE = (MODELS.find(model => model.default) || MODELS[0]).tone;
+  // Saved per-chat selections and readings beyond this many (oldest first) are dropped.
+  const MAX_SAVED_CONVERSATIONS = 2000;
   // Tones match case-insensitively: Copilot's web client sends "Magic" while
   // other clients send "magic", and both are accepted by the service.
   /** @param {unknown} tone @returns {Model | undefined} */
@@ -181,7 +183,7 @@
     });
   }
 
-  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, modelFor, connectionInfo, safeScenario,
+  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
     isChat, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });

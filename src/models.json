@@ -10,6 +10,7 @@
   },
   {
     "tone": "Gpt_6_Sol_Reasoning",
+    "default": true,
     "label": "GPT-6 Sol",
     "menuLabel": "GPT-6 Sol",
     "badge": "6S",
