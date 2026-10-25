@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "M365 Copilot Extender",
-  "version": "0.1.7",
-  "description": "Keep your preferred Copilot model selected and see server-reported usage allowances.",
+  "version": "0.2.0",
+  "description": "Keep your preferred Copilot model selected, per conversation if you like, and see server-reported usage allowances.",
   "minimum_chrome_version": "111",
   "permissions": [
     "storage"
@@ -20,6 +20,9 @@
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"
     }
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

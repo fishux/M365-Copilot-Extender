@@ -43,3 +43,40 @@ Quota refusals may appear only in the final type `2` item with `result.value ===
 `contentOrigin: "DeepLeo"` is used by the proxy as evidence of a serving route; `BotConnection` can indicate a canned refusal. Neither authenticates a precise model version. The proxy also uses model self-identification prompts, which are not reliable independent proof. Distinguish requested tone, observed routing/response metadata, and verified model identity.
 
 Before implementing claims about current backend behavior, capture sanitized observations in the owner's real Chrome/Copilot session: original and modified tone, scenario, override confirmation, response result and content origin, and available quota fields before/after a turn. A control request and an invalid-tone comparison can distinguish a working interceptor from an ignored override. Account for new conversations versus follow-up turns and any agent-specific routing. Do not publish access tokens, full socket URLs, chat text, tenant/account identifiers, or raw captures.
+
+## Follow-up review, 25 October 2026
+
+Same upstream revisions as above (`65905e8`, `c4e8982`; neither had new commits). Source inspection only.
+
+### Conversation identity
+
+- The proxy's API notes (§1, §8) list `ConversationId` as a query parameter on the Chathub socket URL: a client-generated UUID reused across turns to keep server-side context. Each proxy turn opens a fresh WebSocket with the same `ConversationId`; `isStartOfSession` is true only on the first turn.
+- `m365-gui-emulate.mjs` captures the real web client's Chathub URL and replaces its `ConversationId`, which shows the browser client sends one too.
+- The picker's Electron driver (`driver.js`, `currentConversationId`) reads the conversation from the page URL `/chat/conversation/<id>` and falls back to the socket URL's `ConversationId`, noting that navigation can lag a turn. It treats both as the same ID.
+- The picker README says `tone` is per conversation: a new chat resets to `Magic`, and server-rendered history carries a tone per conversation.
+
+Conclusion: a per-conversation model is feasible from the socket URL alone, consistently from the first message of a new chat. Live confirmation of the parameter name and casing in the current client is still required (see the architecture acceptance checks).
+
+### Auto tone casing
+
+The picker captured `Magic` from the web client's own `modelSelectorMetadata` and `availableTones`. The proxy sends lowercase `magic` and is served. The extension keeps sending the client's `Magic` and treats tones case-insensitively when comparing.
+
+### Metering keys reviewed 25 October 2026
+
+Every keyed allowance observed upstream on the paid scenario:
+
+| Key(s) | Model | Notes |
+| --- | --- | --- |
+| `GPT61SolQueryDaily` / `GPT61SolQueryWeekly` | GPT-6.1 Sol (`Gpt_61_Sol_Reasoning`) | 40/day, 75/week; spent only on the paid scenario |
+| `ClaudeOpusQueryDaily` / `ClaudeOpusQuery75` | Claude Opus (`Claude_Opus`) | 40/day; the weekly key is named `…75`, not `…Weekly`; resets at midnight UTC (weekly on Monday) |
+| `ClaudeSonnet55QueryDaily` / `ClaudeSonnet55QueryWeekly` | Claude Sonnet 5.5 (`Claude_Sonnet`, paid) | 80/day, 150/week; the weekly key was seen resetting daily |
+| `ClaudeOpusQuery`, `…Dev`, `…HourlyDev`, `…DailyWord`, `…WeeklyWord`, `…C1`, `DeepResearch` | Not tied to a selectable tone | Present in the map; meaning unestablished |
+
+Findings for the models this extension offers:
+
+- **GPT-6 (`Gpt_6_Reasoning`)** has no priority-access allowance; it is limited by the per-conversation cap and the thread-rate throttle. Its candidate prefix was removed.
+- **GPT-6 Sol and GPT-5.5** turns lowered neither the Opus nor the Sonnet 5.5 keys, and no GPT-6 Sol or GPT-5.5 key appears in the observed maps. They are most likely unmetered; the name-based prefixes are kept only so a future key would be shown.
+- **GPT-5.6** has no observed key and no direct observation either way.
+- **Included-scenario** turns carry no `metering` map at all.
+
+Not done: the Claude tones are not offered by this extension. Opus's weekly key would need an explicit key name in `models.json` (its suffix is `75`, not `Weekly`) if Claude models are added later.

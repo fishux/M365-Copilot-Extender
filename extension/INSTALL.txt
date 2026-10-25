@@ -1,4 +1,4 @@
-M365 Copilot Extender v0.1.7
+M365 Copilot Extender v0.2.0
 
 1. Extract this ZIP to a permanent folder on your Windows computer.
 2. In Google Chrome, open chrome://extensions and enable Developer mode.
@@ -6,9 +6,16 @@ M365 Copilot Extender v0.1.7
 4. Pin M365 Copilot Extender from Chrome's Extensions menu.
 5. Open or reload https://m365.cloud.microsoft after installation.
 
-Use the model dropdown in the Chrome toolbar popup.
+Use the "Default model" dropdown in the Chrome toolbar popup.
 GPT-6.1 Sol is the initial default. Your selection persists in this Chrome
 profile across tabs and browser restarts. No panel is displayed on Copilot.
+
+"This conversation" pins a different model to the chat you are viewing,
+once it has been sent or opened from the sidebar. Only a hash of the
+conversation ID is saved.
+
+The toolbar badge shows the model a tab is using. The icon turns orange at
+20 or fewer remaining messages and red at 10 or fewer.
 
 Send a chat message to obtain usage allowances from Copilot's response.
 Numbers are remaining messages, not estimated totals. Missing values are unknown.

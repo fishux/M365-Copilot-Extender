@@ -15,6 +15,9 @@ for (const content of manifest.content_scripts) {
   if (content.js.length !== 1) throw new Error('Each execution world must have one self-contained script');
   for (const file of content.js) if (!fs.existsSync(path.join(root, file))) throw new Error('Missing ' + file);
 }
+if (manifest.background?.service_worker !== 'background.js' || manifest.background.type) throw new Error('Background must be the classic self-contained background.js worker');
+if (!fs.existsSync(path.join(root, manifest.background.service_worker))) throw new Error('Missing background.js');
+if (manifest.host_permissions?.length) throw new Error('No host permissions are expected');
 for (const file of [...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon), manifest.action.default_popup]) {
   if (!fs.existsSync(path.join(root, file))) throw new Error('Missing ' + file);
 }

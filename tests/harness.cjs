@@ -1,7 +1,12 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const load = (ctx, file) => vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), ctx, { filename: file });
+const models = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/models.json'), 'utf8'));
+// Source core.js reads the model list the build normally inlines.
+const load = (ctx, file) => {
+  if (file === 'core.js') ctx.M365ExtenderModels = JSON.parse(JSON.stringify(models));
+  return vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), ctx, { filename: file });
+};
 const loadBundle = (ctx, file) => vm.runInContext(fs.readFileSync(path.join(__dirname, '../extension', file), 'utf8'), ctx, { filename: file });
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -9,7 +14,7 @@ const chat = (tone = 'Magic', type = 4) => JSON.stringify({ type, target: 'chat'
 const endpoint = 'wss://substrate.office.com/m365Copilot/Chathub/PRIVATE_ACCOUNT?access_token=PRIVATE_TOKEN&scenario=OfficeWebPaidCopilot';
 
 function createStore(initial = {}) {
-  const data = { ...initial }, listeners = [];
+  const data = { ...initial }, listeners = [], tabMessages = [];
   const chrome = {
     storage: {
       local: {
@@ -22,15 +27,17 @@ function createStore(initial = {}) {
       },
       onChanged: { addListener(listener) { listeners.push(listener); } }
     },
-    runtime: { id: 'test-extension', onMessage: { addListener() {} } }
+    runtime: { id: 'test-extension', onMessage: { addListener() {} }, async sendMessage(message) { tabMessages.push(JSON.parse(JSON.stringify(message))); } }
   };
-  return { chrome, data };
+  return { chrome, data, tabMessages };
 }
 
-function environment(store = createStore(), { bundled = false } = {}) {
+function environment(store = createStore(), { bundled = false, pathname = '/chat' } = {}) {
   const messages = [], timers = new Map(), subscribers = [], contents = [];
   const origin = 'https://m365.cloud.microsoft';
   let timerId = 0;
+  // Shared by both worlds; tests may change pathname to simulate navigation.
+  const location = { origin, pathname, get href() { return origin + this.pathname; } };
   class FakeSocket extends EventTarget {
     static OPEN = 1; static CONNECTING = 0; static CLOSED = 3;
     constructor(url) { super(); this.url = url; this.sent = []; this.readyState = 1; }
@@ -39,7 +46,7 @@ function environment(store = createStore(), { bundled = false } = {}) {
     close() { this.readyState = 3; this.dispatchEvent(new Event('close')); }
   }
   function world() {
-    const sandbox = { console, URL, EventTarget, ArrayBuffer, Blob, location: { origin, href: origin + '/chat' },
+    const sandbox = { console, URL, EventTarget, ArrayBuffer, Blob, TextEncoder, crypto: globalThis.crypto, location,
       setTimeout(fn, delay) { timers.set(++timerId, { fn, delay }); return timerId; },
       clearTimeout(id) { timers.delete(id); }, setInterval() {},
       addEventListener(type, listener) { if (type === 'message') subscribers.push({ sandbox, listener }); },
@@ -66,8 +73,8 @@ function environment(store = createStore(), { bundled = false } = {}) {
     return isolated;
   }
 
-  return { main, addContent, store, messages, contents, FakeSocket, timers,
+  return { main, addContent, store, messages, contents, FakeSocket, timers, location,
     timeout(delay) { for (const [id, timer] of [...timers]) if (timer.delay === delay) { timers.delete(id); timer.fn(); } } };
 }
 
-module.exports = { load, loadBundle, settle, clone, chat, endpoint, createStore, environment };
+module.exports = { models, load, loadBundle, settle, clone, chat, endpoint, createStore, environment };

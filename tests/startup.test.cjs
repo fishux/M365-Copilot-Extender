@@ -69,7 +69,8 @@ test('packaged snapshot persists through sparse final frames, idle sockets and p
   assert.equal(updated.origin, 'DeepLeo'); assert.equal(updated.result, 'Success');
   idle.send(chat()); await settle();
   assert.equal(content.snapshot().observed.conversation, undefined);
-  assert.equal(content.snapshot().observed.metering, undefined);
+  // Allowances are account-wide, so they stay visible in the next conversation.
+  assert.deepEqual(content.snapshot().observed.metering, { GPT61SolQueryDaily: 0, GPT61SolQueryWeekly: 48 });
   receive({ result: { value: 'ForbiddenRequest' } }); await settle();
   assert.equal(content.snapshot().observed.result, undefined);
   // Socket creation order does not prevent reusing an earlier connection.

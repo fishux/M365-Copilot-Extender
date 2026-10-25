@@ -1,3 +1,4 @@
+// @ts-check
 /* Toolbar popup UI. Never injected into Copilot. */
 (() => {
   "use strict";
@@ -6,7 +7,7 @@
   const css = `
     :host { all: initial; color-scheme: light dark; --bg:#fff; --ink:#1c2132;
       --muted:#697185; --line:#e7e9f0; --soft:#f6f7fb; --accent:#6254d9;
-      --good:#248568; --warn:#b15722; font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
+      --good:#248568; --warn:#b15722; --low:#c96a0a; --critical:#c5221f; font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
     * { box-sizing:border-box; } [hidden] { display:none !important; }
     .card { width:308px; background:var(--bg); overflow:hidden; }
     .header { display:flex; align-items:center; gap:8px; padding:14px 14px 10px; }
@@ -24,13 +25,14 @@
     select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
     .hint { display:flex; align-items:center; gap:6px; margin:6px 0 0; font-size:11px; color:var(--muted); }
     .hint svg { width:12px; height:12px; flex:none; color:var(--accent); }
+    .conversation-model { margin-top:10px; } .conversation-model select { min-height:34px; font-weight:500; }
     .usage { margin-top:12px; padding:11px; border:1px solid var(--line); border-radius:12px; }
     .usage-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; }
     .usage-head strong { font-size:11px; font-weight:600; } .live { font-size:10px; letter-spacing:.3px; text-transform:uppercase; color:var(--good); }
     .counts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .counts > div + div { border-left:1px solid var(--line); padding-left:11px; }
     .number { display:block; font-size:24px; line-height:1.2; font-weight:600; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
-    .number.zero { color:var(--warn); } .period { font-size:10px; color:var(--muted); }
+    .number.low { color:var(--low); } .number.critical { color:var(--critical); } .period { font-size:10px; color:var(--muted); }
     .usage-note { margin:7px 0 0; font-size:10px; color:var(--muted); } .pending { margin:0; font-size:11px; color:var(--muted); }
     .status { display:flex; align-items:flex-start; gap:7px; margin:10px 0 0; font-size:11px; color:var(--muted); }
     .dot { width:6px; height:6px; margin-top:5px; border-radius:50%; background:#a7aec0; flex:none; }
@@ -50,13 +52,13 @@
     .capacity-fill.near-limit { background:var(--warn); }
     .expiry-row { margin-top:5px; } .expiry-value { color:var(--ink); font-variant-numeric:tabular-nums; }
     .expiry-value:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    @media(prefers-color-scheme:dark) { :host { --bg:#1c1d25; --ink:#f0f0f7; --muted:#a2a6b8; --line:#353641; --soft:#252631; --accent:#b5a6ff; --good:#76d3af; --warn:#f2b07d; } }
+    @media(prefers-color-scheme:dark) { :host { --bg:#1c1d25; --ink:#f0f0f7; --muted:#a2a6b8; --line:#353641; --soft:#252631; --accent:#b5a6ff; --good:#76d3af; --warn:#f2b07d; --low:#f7a94f; --critical:#ff8a80; } }
     @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
   `;
   const logo = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>';
   const lock = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="7" rx="2" stroke="currentColor"/><path d="M5.5 7V4.5a2.5 2.5 0 015 0V7" stroke="currentColor"/></svg>';
 
-  function mount(host, { onSelect }) {
+  function mount(host, { onSelect, onConversationSelect }) {
     const root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style"); style.textContent = css; root.append(style);
     const card = document.createElement("section");
@@ -64,9 +66,12 @@
     card.setAttribute("aria-label", "M365 Copilot Extender");
     // This template is static; server and preference values are set with textContent.
     card.innerHTML = `<header class="header"><span class="logo">${logo}</span><div class="brand"><div class="eyebrow">M365 Copilot</div><h2>Extender</h2></div></header>
-      <div class="body"><label class="field-label" for="model">Preferred model</label>
+      <div class="body"><label class="field-label" for="model">Default model</label>
       <div class="select-wrap"><select id="model" disabled></select><span class="chevron" aria-hidden="true">⌄</span></div>
       <p class="hint">${lock}<span class="save-label">Loading saved preference…</span></p>
+      <div class="conversation-model" hidden><label class="field-label" for="conversation-model">This conversation</label>
+      <div class="select-wrap"><select id="conversation-model" disabled><option value="">Use default</option></select><span class="chevron" aria-hidden="true">⌄</span></div>
+      <p class="hint conversation-hint">Send a message to choose a model for this chat.</p></div>
       <section class="usage" aria-label="Model usage allowance" hidden><div class="usage-head"><strong>Messages remaining</strong><span class="live">Server reported</span></div>
       <div class="counts"><div><span class="number daily">—</span><span class="period">Daily allowance</span></div><div><span class="number weekly">—</span><span class="period">Weekly allowance</span></div></div>
       <p class="pending" hidden>Send a message to check your allowance.</p><p class="usage-note"></p></section>
@@ -79,14 +84,19 @@
       <section class="connection-details" aria-label="Connection details"><h3 class="connection-title">Connection details</h3><dl><div><dt>Route</dt><dd class="route">Not observed</dd></div><div><dt>Last request</dt><dd class="requested">Not observed</dd></div><div><dt>Response</dt><dd class="response">Not observed</dd></div><div><dt>Origin</dt><dd class="origin">Not observed</dd></div></dl>
       <p class="disclaimer">Requests your selected model. Microsoft controls final model routing.</p></section></div>`;
     root.append(card);
-    const find = selector => card.querySelector(selector);
-    const select = find("select");
+    /** @type {(selector: string) => HTMLElement} */
+    const find = selector => /** @type {HTMLElement} */ (card.querySelector(selector));
+    const select = /** @type {HTMLSelectElement} */ (find("#model"));
+    const conversationSelect = /** @type {HTMLSelectElement} */ (find("#conversation-model"));
     for (const model of core.MODELS) {
-      const option = document.createElement("option"); option.value = model.tone;
-      option.textContent = model.label + (model.subtitle === "Think deeper" ? " · Think deeper" : "");
-      select.append(option);
+      for (const target of [select, conversationSelect]) {
+        const option = document.createElement("option"); option.value = model.tone;
+        option.textContent = model.menuLabel;
+        target.append(option);
+      }
     }
     select.addEventListener("change", () => onSelect(select.value));
+    conversationSelect.addEventListener("change", () => onConversationSelect(conversationSelect.value || null));
 
     function update(state) {
       select.value = state.tone;
@@ -95,9 +105,17 @@
       find(".error").hidden = !state.error;
       find(".error").textContent = state.error || "";
       const observed = state.observed || {};
-      const quota = core.allowanceFor(state.tone, observed.metering);
-      const model = core.modelFor(state.tone);
-      const knownPaidCap = model?.capped && observed.scenario !== "OfficeWebIncludedCopilot";
+      // A per-conversation choice overrides the default for this chat.
+      const tone = state.conversationTone || state.tone;
+      const conversationBox = find(".conversation-model");
+      conversationBox.hidden = state.connected === false;
+      conversationSelect.value = state.conversationTone || "";
+      conversationSelect.disabled = !state.conversation || !state.loaded || state.saving;
+      /** @type {HTMLOptionElement} */ (conversationSelect.options[0]).textContent = `Use default (${core.modelFor(state.tone)?.label ?? "—"})`;
+      find(".conversation-hint").textContent = state.conversation ? "Applies to this chat only, across tabs & restarts." : "Send a message to choose a model for this chat.";
+      const quota = core.allowanceFor(tone, observed.metering);
+      const model = core.modelFor(tone);
+      const knownPaidCap = model?.knownPaidCap && observed.scenario !== "OfficeWebIncludedCopilot";
       const showUsage = Boolean(quota || knownPaidCap);
       find(".usage").hidden = !showUsage;
       find(".counts").hidden = !quota;
@@ -107,14 +125,16 @@
       for (const period of ["daily", "weekly"]) {
         const value = quota?.[period];
         find(`.${period}`).textContent = value === null || value === undefined ? "—" : String(value);
-        find(`.${period}`).classList.toggle("zero", value === 0);
+        const level = core.allowanceLevel(typeof value === "number" ? value : null);
+        find(`.${period}`).classList.toggle("low", level === "warn");
+        find(`.${period}`).classList.toggle("critical", level === "critical");
       }
       const age = observed.quotaAt ? Date.now() - observed.quotaAt : 0;
       find(".usage-note").textContent = quota ? `${age > STALE_MS ? "Last known · " : "Updated "}${new Date(observed.quotaAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Refreshes after a reply` : "Allowances appear when Copilot reports them.";
       let text = state.connected === false ? "Open Copilot to see connection and usage details." : "Ready for your next message";
       let status = "";
       if (state.connected !== false && !state.hookReady) { text = "Connecting to Copilot…"; }
-      if (observed.appliedTone === state.tone) { text = "Preference applied to the last request"; status = "good"; }
+      if (observed.appliedTone === tone) { text = "Preference applied to the last request"; status = "good"; }
       if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "warn"; }
       else if (observed.result && observed.result !== "Success") { text = `Copilot response: ${observed.result}`; status = "warn"; }
       if (observed.warning) { text = observed.warning; status = "warn"; }
@@ -133,7 +153,7 @@
       meter.hidden = conversation.percent === null;
       if (conversation.percent !== null) {
         meter.setAttribute("aria-valuemax", String(conversation.limit));
-        meter.setAttribute("aria-valuenow", String(Math.min(conversation.used, conversation.limit)));
+        meter.setAttribute("aria-valuenow", String(Math.min(conversation.used ?? 0, conversation.limit ?? 0)));
         meter.setAttribute("aria-valuetext", conversation.capacity);
       } else {
         for (const attribute of ["aria-valuemax", "aria-valuenow", "aria-valuetext"]) meter.removeAttribute(attribute);

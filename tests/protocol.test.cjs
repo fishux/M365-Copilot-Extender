@@ -35,7 +35,11 @@ test('rejects malformed chat shapes and leaves an already selected frame byte-id
   assert.equal(core.rewrite(chat(core.DEFAULT_TONE), core.DEFAULT_TONE).data, chat(core.DEFAULT_TONE));
 });
 test('endpoint scoping excludes unrelated sockets and strips credentials', () => {
-  assert.deepEqual(clone(core.connectionInfo(endpoint)), { scenario: 'OfficeWebPaidCopilot' });
+  assert.deepEqual(clone(core.connectionInfo(endpoint)), { scenario: 'OfficeWebPaidCopilot', conversationId: null });
+  const id = '3F2504E0-4F89-11D3-9A0C-0305E82C3301';
+  assert.deepEqual(clone(core.connectionInfo(endpoint + '&ConversationId=' + id)), { scenario: 'OfficeWebPaidCopilot', conversationId: id.toLowerCase() });
+  assert.equal(core.connectionInfo(endpoint + '&conversationid=' + id).conversationId, id.toLowerCase());
+  for (const bad of ['', 'short', '../../etc', id + '<script>']) assert.equal(core.connectionInfo(endpoint + '&ConversationId=' + encodeURIComponent(bad)).conversationId, null);
   for (const url of ['wss://evil.example/m365Copilot/Chathub/a', 'wss://substrate.office.com.evil.example/m365Copilot/Chathub/a', 'wss://substrate.office.com/telemetry', 'invalid']) assert.equal(core.connectionInfo(url), null);
 });
 test('reads zero allowances and rejects missing, negative, non-finite and string values', () => {
