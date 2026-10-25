@@ -3,6 +3,7 @@
 
 interface Model {
   readonly tone: string;
+  readonly default?: boolean;
   readonly label: string;
   readonly menuLabel: string;
   readonly badge: string;
@@ -43,7 +44,15 @@ interface Observed {
   conversation?: { used: number; limit: number };
   expiresAt?: string;
   warning?: string;
+  /** When this reading last changed (ms). Newer saved or live readings win. */
+  at?: number;
 }
+
+/** Saved per-conversation readings, keyed by a hash of the ConversationId. */
+type ConversationReadings = Record<string, Observed & { at: number }>;
+
+/** Last reported allowances, shared by every tab. */
+interface Usage { metering: Record<string, number>; quotaAt: number }
 
 interface ConversationView {
   capacity: string;
@@ -60,6 +69,7 @@ interface ConversationView {
 interface Core {
   MODELS: readonly Model[];
   DEFAULT_TONE: string;
+  MAX_SAVED_CONVERSATIONS: number;
   ALLOWANCE_LEVELS: Readonly<{ warn: number; critical: number }>;
   modelFor(tone: unknown): Model | undefined;
   connectionInfo(rawURL: string): ConnectionInfo | null;
@@ -94,7 +104,7 @@ interface PopupState {
 }
 
 interface Panel {
-  mount(host: HTMLElement, handlers: { onSelect(tone: string): void; onConversationSelect(tone: string | null): void }): { update(state: PopupState): void };
+  mount(host: HTMLElement, handlers: { onConversationSelect(tone: string | null): void }): { update(state: PopupState): void };
 }
 
 declare var M365ExtenderModels: Model[];

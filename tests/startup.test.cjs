@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { environment, createStore, settle, endpoint, chat } = require('./harness.cjs');
+const { environment, createStore, settle, endpoint, chat, clone } = require('./harness.cjs');
 
 test('packaged entry points have no separate shared-core script dependency', () => {
   const root = path.join(__dirname, '../extension');
@@ -38,7 +38,8 @@ test('actual bundle handles an early chat before saved settings finish loading',
   const socket = new env.main.WebSocket(endpoint); socket.send(chat());
   assert.equal(socket.sent.length, 0);
   resolve({ selectedTone: 'Gpt_5_5_Reasoning' }); await settle();
-  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_5_5_Reasoning');
+  // A legacy saved default is ignored: the default model is fixed.
+  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_6_Sol_Reasoning');
 });
 
 
@@ -76,5 +77,7 @@ test('packaged snapshot persists through sparse final frames, idle sockets and p
   // Socket creation order does not prevent reusing an earlier connection.
   socket.send(chat()); receive({ result: { value: 'Success' } }); await settle();
   assert.equal(content.snapshot().observed.result, 'Success');
-  assert.deepEqual(env.store.data, {});
+  // Only allowances are saved: these connections carry no conversation ID.
+  assert.deepEqual(Object.keys(env.store.data), ['usage']);
+  assert.deepEqual(clone(env.store.data.usage.metering), { GPT61SolQueryDaily: 0, GPT61SolQueryWeekly: 48 });
 });

@@ -1,6 +1,6 @@
 // Test-only Chrome mock. Never included in the extension ZIP.
 window.fixtureStore = {
-  data: { selectedTone: 'Gpt_61_Sol_Reasoning' },
+  data: {},
   listeners: [],
   async get() { return { ...this.data }; },
   async set(patch) {

@@ -2,6 +2,19 @@
 
 All notable changes to M365 Copilot Extender. Versions match `extension/manifest.json`.
 
+## Unreleased
+
+### Changed
+- **GPT-6 Sol is the fixed default.** Every chat starts on it. The saved default (`selectedTone`) and the default selector are retired.
+- **Switching a chat's model sticks.** Click a model in the popup and the chat you're viewing uses it from then on, in every tab and across restarts. Clicking the default returns the chat to the default; chats never switched follow the default. Up to 2,000 chats keep their choice (was 200).
+- **Console-style popup.** All six models are listed on one screen; the dropdowns and pins are gone.
+- A status line at the top of the popup names the model the last request was sent via (and the next one, if you've just switched), or the last error. Hook warnings appear in their own box.
+- **Per-chat readings persist.** Each chat's last readings (model sent via, result, origin, capacity, expiry) are saved under its hashed conversation ID, so they show in other tabs and after a restart.
+- **Allowances persist.** The last reported allowances are saved and shared by every tab, updated by each new reply that reports them, and shown even outside Copilot.
+- Connection details moved into a **details** drawer.
+- Outside Copilot the popup links to M365 Copilot; preferences can still be changed.
+- Light and dark themes follow the system setting. The popup is 340px wide with 32px model rows.
+
 ## 0.2.0 — 2026-10-25
 
 ### Added
