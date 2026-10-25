@@ -8,13 +8,13 @@ The toolbar icon shows which model the current tab is using and turns orange, th
 
 ## Install on Windows
 
-1. Download this repository using **Code → Download ZIP**, then extract it to a permanent folder. Alternatively, extract a packaged extension ZIP.
+1. Download `M365-Copilot-Extender-v<version>.zip` from the [latest release](https://github.com/fishux/M365-Copilot-Extender/releases/latest) and extract it to a permanent folder. (Alternatively, use **Code → Download ZIP** on this repository.)
 2. In Google Chrome, open `chrome://extensions` and enable **Developer mode**.
-3. Click **Load unpacked**. Select this repository's `extension` folder, or the extracted package folder containing `manifest.json`.
+3. Click **Load unpacked**. Select the extracted folder containing `manifest.json` (or this repository's `extension` folder).
 4. Pin **M365 Copilot Extender** from Chrome's Extensions menu.
-5. Reload any already-open Copilot tabs. Choose a model in the toolbar popup and send a message.
+5. Reload any already-open Copilot tabs. Send a message, then use the toolbar popup to switch the chat's model.
 
-When updating, replace the extension files, click **Reload** on its `chrome://extensions` card, then reload Copilot. Keep the unpacked folder in place so Chrome can load it on restart. Settings belong to this Chrome profile; they do not synchronize across separate profiles or devices.
+When updating, replace the extension files in the same folder, click **Reload** on its `chrome://extensions` card, then reload Copilot. Keep the unpacked folder in place so Chrome can load it on restart. Saved choices and readings belong to this Chrome profile; they do not synchronize across separate profiles or devices.
 
 ## Models
 
@@ -50,11 +50,11 @@ Counters show **remaining messages** reported by Copilot, refreshed after a resp
 - Allowances are per account, so they stay visible when you switch to another conversation in the same tab.
 - The last reported allowances are **saved in `chrome.storage.local`** and shared by every tab in this Chrome profile. Each new reply that reports an allowance updates the values it reports; others keep their last value. Allowances also show when the popup is opened outside Copilot. If you use two Microsoft accounts in one Chrome profile, the most recent reply's allowances are shown. Old readings are marked **Last known** after five minutes; they refresh only with a new response.
 
-The status line at the top of the popup shows whether your preference was applied to the last request, or the last error. The **details** drawer shows the observed scenario, the last requested model, result code, and known content origin. If a request reaches a usage limit, the status line says so; the popup never switches models automatically.
+The status line at the top of the popup names the model the last request was sent via (and the next one, right after you switch), or the last error. The **details** drawer shows the observed scenario, the last requested model, result code, and known content origin. If a request reaches a usage limit, the status line says so; the popup never switches models automatically.
 
 ## Conversation capacity and expiry
 
-The toolbar popup includes a compact conversation section below model usage:
+The toolbar popup includes a compact chat section below the model list:
 
 - **Capacity:** the server's used/maximum message counts and a slim meter. It highlights at 90% capacity. The maximum is read from Copilot, never assumed to be 600, and is separate from model allowances. Hover the count for remaining conversation messages.
 - **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
@@ -67,7 +67,7 @@ Every chat starts on the default, GPT-6 Sol. Click another model's row in the po
 
 - Switching becomes available once the conversation has an ID: after its first message is sent, or when you open an existing chat from the sidebar.
 - Conversations are identified by the `ConversationId` that Copilot's own client attaches to its Chathub connection (and shows in `/chat/conversation/<id>` URLs). Only a SHA-256 hash of that ID is saved, together with the model and a timestamp. The 2,000 most recently used chats keep their choice and readings; older entries are dropped.
-- Before the first chat request on a connection, the hook briefly waits for that conversation's choice, as it already does for the default. If it never arrives within 1.5 seconds, the default model is used and a warning is shown.
+- Before the first chat request on a connection, the hook briefly waits for that conversation's choice. If it never arrives within 1.5 seconds, the default model is used and a warning is shown.
 - Copilot's own picker also stores a model per conversation on the server. The extension overrides what is sent; it does not change what Copilot's picker displays.
 
 ## Toolbar badge
@@ -99,7 +99,7 @@ For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and 
 
 GitHub Actions runs `npm run check`, `npm test` and `npm run typecheck` on Node 20, 22 and 24 for every pull request and push to `main` ([workflow](.github/workflows/ci.yml)). The browser preview checks are still run by hand.
 
-Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab preference propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. Persistence tests cover allowances shared across tabs and per-chat readings restored in a new tab. The browser fixture checks the model rows, the GPT-6 Sol default, switching a chat's model, the status line, usage states and colours, saved allowances and readings, and absence of injected page controls.
+Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab propagation of chat choices, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. Persistence tests cover allowances shared across tabs and per-chat readings restored in a new tab. The browser fixture checks the model rows, the GPT-6 Sol default, switching a chat's model, the status line, usage states and colours, saved allowances and readings, and absence of injected page controls.
 
 **Live account validation remains required.** These checks establish extension behavior against fixtures; they do not establish current Microsoft availability, backend identity, or account-specific quota policies. No Microsoft account credentials are needed for the test suite.
 
@@ -115,6 +115,4 @@ No upstream implementation has been incorporated.
 
 If the badge or model switching doesn't work after updating, reload the extension at `chrome://extensions` and then reload every open Copilot tab: the page hook only attaches when the page loads.
 
-Since v0.1.7 the runtime scripts are self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Live validation remains necessary.
-
-To try this update, extract it into a new folder, point the Chrome extension at that folder (or replace every file in its current folder), reload the extension at `chrome://extensions`, then reload the Copilot tab. Clear old extension errors before sending one new message so stale errors are not confused with current ones. Disable any older model-picker extension during the test to keep the comparison controlled.
+The runtime scripts are self-contained, so there is no shared script that must load first. This removed the dependency implicated in an earlier reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error; the exact cause in that installation was never confirmed. Startup tests run the packaged scripts without a global core. If you still see errors after updating, clear old errors on the extension's `chrome://extensions` card before sending one new message so stale errors are not confused with current ones, and disable any other model-picker extension while testing.
