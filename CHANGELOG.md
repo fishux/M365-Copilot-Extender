@@ -12,6 +12,7 @@ All notable changes to M365 Copilot Extender. Versions match `extension/manifest
 - `src/models.json` as the single list of models. `npm run build` inlines it into every runtime script and regenerates the model tables in `README.md` and `docs/architecture.md`.
 - `npm run typecheck`: JSDoc and `// @ts-check` type checking of `src/` with strict null checks (TypeScript and Chrome types as pinned dev dependencies only).
 - `CHANGELOG.md`.
+- GitHub Actions CI: `npm run check`, `npm test` and `npm run typecheck` on Node 20, 22 and 24 for pull requests and pushes to `main`.
 
 ### Changed
 - Conversation readings (capacity, expiry, result, origin, last request) are tracked per conversation and follow the conversation shown in the page, including when switching chats in the sidebar. Model allowances are account-wide and stay visible across conversations.

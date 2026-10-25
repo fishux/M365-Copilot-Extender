@@ -97,6 +97,8 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and click **Run UI checks**. The preview uses the actual extension UI and hook with a simulated Chrome API and WebSocket transport. Its test doubles are excluded from the extension package. The package command writes `outputs/M365-Copilot-Extender-v<version>.zip` with `manifest.json` in the ZIP root.
 
+GitHub Actions runs `npm run check`, `npm test` and `npm run typecheck` on Node 20, 22 and 24 for every pull request and push to `main` ([workflow](.github/workflows/ci.yml)). The browser preview checks are still run by hand.
+
 Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab preference propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. The browser fixture checks the toolbar selectors, usage states and colours, the conversation override, active-tab readings, and absence of injected page controls.
 
 **Live account validation remains required.** These checks establish extension behavior against fixtures; they do not establish current Microsoft availability, backend identity, or account-specific quota policies. No Microsoft account credentials are needed for the test suite.
