@@ -22,6 +22,10 @@ test('preserves handshakes, pings, Metrics, malformed JSON, binary data, trailin
   assert.equal(core.rewrite(other, core.DEFAULT_TONE).data, other);
   const binary = new Uint8Array([1, 2]); assert.equal(core.rewrite(binary, core.DEFAULT_TONE).data, binary);
   assert.equal(core.rewrite(chat(), 'bogus').data, chat());
+  // Chat records are counted even when no valid tone is configured (fail-open).
+  assert.equal(result.chats, 1); assert.equal(core.rewrite(other, core.DEFAULT_TONE).chats, 0);
+  assert.equal(core.rewrite(chat(), null).chats, 1); assert.equal(core.rewrite(chat(), null).tones.length, 0);
+  assert.equal(core.rewrite(binary, core.DEFAULT_TONE).chats, 0);
 });
 test('rejects malformed chat shapes and leaves an already selected frame byte-identical', () => {
   for (const args of [null, {}, [], [null], [[]]]) {

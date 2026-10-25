@@ -44,7 +44,7 @@
   function sendNow(socket, state, data) {
     const rewritten = core.rewrite(data, selectedTone);
     const result = nativeSend.call(socket, rewritten.data);
-    if (core.parseRecords(data).some(core.isChat)) {
+    if (rewritten.chats) {
       emit("request", { scenario: state.scenario, socketId: state.socketId });
     }
     if (rewritten.tones.length) {
@@ -94,8 +94,8 @@
     try { state = watch(this); } catch { return nativeSend.call(this, data); }
     // Preserve native errors (including CONNECTING / invalid receiver).
     if (!state || this.readyState !== NativeWebSocket.OPEN) return nativeSend.call(this, data);
-    const chat = core.parseRecords(data).some(core.isChat);
-    if ((!initialized && chat) || state.queue.length) {
+    // Once configured, skip this extra parse; sendNow parses each payload once.
+    if (state.queue.length || (!initialized && core.parseRecords(data).some(core.isChat))) {
       state.queue.push(data);
       waiting.add(this);
       if (!state.timer) {

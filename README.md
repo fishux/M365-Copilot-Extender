@@ -84,8 +84,8 @@ Automated coverage includes multi-record framing, all six models, native socket 
 
 No upstream implementation has been incorporated.
 
-## Startup fix
+## Troubleshooting startup errors
 
-The runtime scripts are now self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Live validation remains necessary.
+Since v0.1.7 the runtime scripts are self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Live validation remains necessary.
 
 To try this update, extract it into a new folder, point the Chrome extension at that folder (or replace every file in its current folder), reload the extension at `chrome://extensions`, then reload the Copilot tab. Clear old extension errors before sending one new message so stale errors are not confused with current ones. Disable any older model-picker extension during the test to keep the comparison controlled.

@@ -30,20 +30,20 @@
       // readings until a chat is actually sent on a different connection.
       if (activeSocketId === null) {
         activeSocketId = message.socketId;
-        state.observed.scenario = safeScenario(message.scenario);
+        state.observed.scenario = core.safeScenario(message.scenario);
       }
     } else if (message.kind === "request" || (message.kind === "applied" && core.modelFor(message.tone))) {
       if (activeSocketId !== message.socketId) state.observed = {};
       activeSocketId = message.socketId;
       if (message.kind === "applied") state.observed.appliedTone = message.tone;
-      state.observed.scenario = safeScenario(message.scenario);
+      state.observed.scenario = core.safeScenario(message.scenario);
       if (state.loaded) delete state.observed.warning;
     } else if (message.kind === "warning" && warnings[message.code]) {
       if (message.socketId && message.socketId !== activeSocketId) return;
       observed.warning = warnings[message.code];
     } else if (message.kind === "metadata") {
       if (message.socketId !== activeSocketId) return;
-      observed.scenario = safeScenario(message.scenario);
+      observed.scenario = core.safeScenario(message.scenario);
       if (message.metering && typeof message.metering === "object") {
         // Revalidate data from the page, which is not an authenticated boundary.
         const metering = core.parseMetering(Object.fromEntries(Object.entries(message.metering).map(([key, value]) => [key, { remainingAllowance: value }])));
@@ -57,12 +57,9 @@
       if (core.count(message.conversation?.used) !== null && core.count(message.conversation?.limit) !== null) observed.conversation = { used: message.conversation.used, limit: message.conversation.limit };
       const expiresAt = core.parseExpiry(message.expiresAt);
       if (expiresAt) observed.expiresAt = expiresAt;
-    } else { return; }
+    }
   });
 
-  function safeScenario(value) {
-    return ["OfficeWebPaidCopilot", "OfficeWebIncludedCopilot"].includes(value) ? value : "Unknown";
-  }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (changes.selectedTone) {
@@ -81,7 +78,7 @@
     state.loaded = true; configure();
   }).catch(() => {
     state.observed.warning = "Preferences unavailable; this tab is using Copilot’s setting.";
-    post({ kind: "configure", tone: null });
+    configure();
   });
   post({ kind: "hello" });
   setTimeout(() => {

@@ -6,25 +6,20 @@
   const css = `
     :host { all: initial; color-scheme: light dark; --bg:#fff; --ink:#1c2132;
       --muted:#697185; --line:#e7e9f0; --soft:#f6f7fb; --accent:#6254d9;
-      --tint:#efedff; --good:#248568; --warn:#b15722; font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
+      --good:#248568; --warn:#b15722; font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
     * { box-sizing:border-box; } [hidden] { display:none !important; }
-    .card { width:288px; max-width:calc(100vw - 24px); background:var(--bg); border:1px solid var(--line); border-radius:18px;
-      box-shadow:0 14px 50px #17213b1a,0 2px 8px #17213b08; overflow:hidden; }
-    .popup { width:308px; max-width:none; border:0; border-radius:0; box-shadow:none; }
-    .header { display:flex; align-items:center; gap:8px; padding:14px 14px 12px; }
+    .card { width:308px; background:var(--bg); overflow:hidden; }
+    .header { display:flex; align-items:center; gap:8px; padding:14px 14px 10px; }
     .logo { display:grid; place-items:center; width:28px; height:28px; flex:none; border-radius:9px;
       color:white; background:linear-gradient(145deg,#8c76ed,#5145bb); box-shadow:0 3px 9px #6254d926; }
     .logo svg { width:18px; height:18px; }
     .brand { flex:1; } h2 { margin:0; font-size:14px; font-weight:650; letter-spacing:-.2px; }
     .eyebrow { font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); }
-    select { font:inherit; }
     .body { padding:0 14px 13px; }
-    .popup .header { padding-top:14px; padding-bottom:10px; }
-    .popup .body { padding-bottom:13px; }
     label.field-label { display:block; margin:0 0 5px; font-size:11px; font-weight:600; color:var(--muted); }
     .select-wrap { position:relative; } select { display:block; width:100%; min-height:39px;
       appearance:none; padding:8px 32px 8px 11px; border:1px solid var(--line); border-radius:11px;
-      background:var(--soft); color:var(--ink); font-size:13px; font-weight:600; cursor:pointer; }
+      background:var(--soft); color:var(--ink); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
     select:disabled { cursor:wait; opacity:.6; } .chevron { position:absolute; right:12px; top:10px; pointer-events:none; color:var(--muted); }
     select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
     .hint { display:flex; align-items:center; gap:6px; margin:6px 0 0; font-size:11px; color:var(--muted); }
@@ -55,7 +50,7 @@
     .capacity-fill.near-limit { background:var(--warn); }
     .expiry-row { margin-top:5px; } .expiry-value { color:var(--ink); font-variant-numeric:tabular-nums; }
     .expiry-value:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    @media(prefers-color-scheme:dark) { :host { --bg:#1c1d25; --ink:#f0f0f7; --muted:#a2a6b8; --line:#353641; --soft:#252631; --accent:#b5a6ff; --tint:#302943; --good:#76d3af; --warn:#f2b07d; } }
+    @media(prefers-color-scheme:dark) { :host { --bg:#1c1d25; --ink:#f0f0f7; --muted:#a2a6b8; --line:#353641; --soft:#252631; --accent:#b5a6ff; --good:#76d3af; --warn:#f2b07d; } }
     @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
   `;
   const logo = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>';
@@ -65,7 +60,7 @@
     const root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style"); style.textContent = css; root.append(style);
     const card = document.createElement("section");
-    card.className = "card popup";
+    card.className = "card";
     card.setAttribute("aria-label", "M365 Copilot Extender");
     // This template is static; server and preference values are set with textContent.
     card.innerHTML = `<header class="header"><span class="logo">${logo}</span><div class="brand"><div class="eyebrow">M365 Copilot</div><h2>Extender</h2></div></header>

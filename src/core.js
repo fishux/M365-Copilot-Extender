@@ -13,7 +13,16 @@
   const modelFor = tone => MODELS.find(model => model.tone === tone);
   const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const SCENARIOS = Object.freeze(["OfficeWebPaidCopilot", "OfficeWebIncludedCopilot"]);
+  const safeScenario = value => SCENARIOS.includes(value) ? value : "Unknown";
   const RS = "\x1e";
+
+  function timeRemaining(timeLeft) {
+    if (timeLeft <= 0) return "Passed";
+    if (timeLeft < 3_600_000) return "<1h";
+    if (timeLeft < 172_800_000) return `${Math.ceil(timeLeft / 3_600_000)}h`;
+    return `${Math.ceil(timeLeft / 86_400_000)}d`;
+  }
 
   function parseExpiry(value) {
     if (typeof value !== "string" || value.length > 40 ||
@@ -28,9 +37,7 @@
     const used = count(conversation?.used), limit = count(conversation?.limit);
     const known = used !== null && limit !== null;
     const expiry = parseExpiry(expiresAt);
-    const timeLeft = expiry ? Date.parse(expiry) - now : null;
     const shortDate = expiry ? new Date(expiry).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
-    const remaining = timeLeft <= 0 ? "Passed" : timeLeft < 3_600_000 ? "<1h" : timeLeft < 172_800_000 ? `${Math.ceil(timeLeft / 3_600_000)}h` : `${Math.ceil(timeLeft / 86_400_000)}d`;
     return {
       capacity: known ? `${used} / ${limit} messages` : "Awaiting reply",
       capacityTitle: known ? `${Math.max(0, limit - used)} messages remaining in this conversation. Separate from model usage allowances.` : "Copilot has not reported conversation capacity.",
@@ -38,7 +45,7 @@
       percent: known && limit > 0 ? Math.min(100, used / limit * 100) : null,
       nearLimit: known && (limit === 0 || used / limit >= 0.9),
       expiry,
-      expiryText: expiry ? `${shortDate} · ${remaining}` : "Not reported",
+      expiryText: expiry ? `${shortDate} · ${timeRemaining(Date.parse(expiry) - now)}` : "Not reported",
       expiryTitle: expiry ? `${new Date(expiry).toLocaleString()} — server-reported conversation expiry; not a guaranteed data deletion date.` : "Copilot has not reported a conversation expiry time."
     };
   }
@@ -49,8 +56,7 @@
       if (url.protocol !== "wss:" || url.hostname !== "substrate.office.com" ||
           !/^\/m365Copilot\/Chathub\//i.test(url.pathname)) return null;
       // Never return full URLs: they may contain access tokens and account IDs.
-      const scenario = url.searchParams.get("scenario");
-      return { scenario: ["OfficeWebPaidCopilot", "OfficeWebIncludedCopilot"].includes(scenario) ? scenario : "Unknown" };
+      return { scenario: safeScenario(url.searchParams.get("scenario")) };
     } catch { return null; }
   }
 
@@ -67,20 +73,26 @@
     });
   }
 
+  // Parses once and reports how many chat records were seen, so callers need
+  // not re-parse a (possibly large) prompt payload to detect chat requests.
   function rewrite(data, tone) {
     const tones = [];
-    if (typeof data !== "string" || !modelFor(tone)) return { data, tones };
+    let chats = 0;
+    if (typeof data !== "string") return { data, tones, chats };
+    const valid = Boolean(modelFor(tone));
     const parts = data.split(RS).map(part => {
       try {
         const frame = JSON.parse(part);
         if (!isChat(frame)) return part;
+        chats++;
+        if (!valid) return part;
         tones.push(tone);
         if (frame.arguments[0].tone === tone) return part;
         frame.arguments[0].tone = tone;
         return JSON.stringify(frame);
       } catch { return part; }
     });
-    return { data: tones.length ? parts.join(RS) : data, tones };
+    return { data: tones.length ? parts.join(RS) : data, tones, chats };
   }
 
   function parseMetering(raw) {
@@ -141,7 +153,7 @@
     });
   }
 
-  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, modelFor, connectionInfo,
+  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, modelFor, connectionInfo, safeScenario,
     isChat, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });
 })();
