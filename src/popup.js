@@ -75,7 +75,7 @@
       if (revisions[key] === initialRevisions[key] && key in settings) applySettings({ [key]: settings[key] });
     }
     state.loaded = true; render();
-  }).catch(() => { state.error = "Could not load saved preferences. Reopen this popup to retry."; render(); });
+  }).catch(() => { state.error = "Could not load saved choices. Reopen this popup to retry."; render(); });
 
   async function readTab() {
     try {

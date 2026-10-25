@@ -67,7 +67,7 @@
     const card = document.createElement("section");
     card.className = "card";
     card.setAttribute("aria-label", "M365 Copilot Extender");
-    // This template is static; server and preference values are set with textContent.
+    // This template is static; server and saved values are set with textContent.
     card.innerHTML = `<header class="header"><span class="brand">copilot-extender</span><span class="route"></span></header>
       <div class="body">
       <p class="status" role="status" aria-live="polite"><span class="dot"></span><span class="status-text">Waiting for Copilot</span></p>
@@ -89,7 +89,7 @@
       <dl><div><dt>route</dt><dd class="route-value">Not observed</dd></div><div><dt>request</dt><dd class="requested">Not observed</dd></div>
       <div><dt>response</dt><dd class="response">Not observed</dd></div><div><dt>origin</dt><dd class="origin">Not observed</dd></div></dl>
       <p class="disclaimer">Requests your selected model. Microsoft controls final routing; origin doesn't verify the backend model.</p></section>
-      <footer class="footer"><span class="save-label">Loading saved preference…</span>
+      <footer class="footer"><span class="save-label">Loading saved choices…</span>
       <button type="button" class="chip toggle" aria-expanded="false" aria-controls="details">details <span class="arrow" aria-hidden="true">▾</span></button></footer>
       </div>`;
     root.append(card);

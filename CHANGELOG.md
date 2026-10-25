@@ -2,6 +2,11 @@
 
 All notable changes to M365 Copilot Extender. Versions match `extension/manifest.json`.
 
+## 0.3.1 — 2026-10-25
+
+- Refreshed the install notes (`INSTALL.txt`), README, architecture notes and manifest description, which still described the old default selector, pins and GPT-6.1 Sol default.
+- The release now ships an extension-only ZIP (`manifest.json` at its root) alongside GitHub's source archive.
+
 ## 0.3.0 — 2026-10-25
 
 - **GPT-6 Sol is the fixed default.** Every chat starts on it. The saved default and the default selector are retired.

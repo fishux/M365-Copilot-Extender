@@ -1,4 +1,4 @@
-M365 Copilot Extender v0.3.0
+M365 Copilot Extender v0.3.1
 
 1. Extract this ZIP to a permanent folder on your Windows computer.
 2. In Google Chrome, open chrome://extensions and enable Developer mode.
@@ -6,13 +6,18 @@ M365 Copilot Extender v0.3.0
 4. Pin M365 Copilot Extender from Chrome's Extensions menu.
 5. Open or reload https://m365.cloud.microsoft after installation.
 
-Use the "Default model" dropdown in the Chrome toolbar popup.
-GPT-6.1 Sol is the initial default. Your selection persists in this Chrome
-profile across tabs and browser restarts. No panel is displayed on Copilot.
+When updating, replace the files in the same folder, click Reload on the
+extension's card at chrome://extensions, then reload every Copilot tab.
 
-"This conversation" pins a different model to the chat you are viewing,
-once it has been sent or opened from the sidebar. Only a hash of the
-conversation ID is saved.
+Every chat starts on GPT-6 Sol, the fixed default. Send a message, then open
+the toolbar popup and click another model to switch the chat you are viewing.
+That chat stays on the model you chose in every tab and across browser
+restarts; other chats are not affected. Click GPT-6 Sol to return a chat to
+the default. Only a hash of the conversation ID is saved. No panel is
+displayed on Copilot.
+
+The popup's status line shows which model the last request was sent via. The
+"details" button shows the connection route, last request, response and origin.
 
 The toolbar badge shows the model a tab is using. The icon turns orange at
 20 or fewer remaining messages and red at 10 or fewer.
@@ -20,17 +25,18 @@ The toolbar badge shows the model a tab is using. The icon turns orange at
 Send a chat message to obtain usage allowances from Copilot's response.
 Numbers are remaining messages, not estimated totals. Missing values are unknown.
 Only models with documented or observed model-specific budgets show counters.
-The popup shows information from the active Copilot tab.
+The last reported allowances are saved and shared by every tab.
 
-The compact conversation section shows reported message capacity and server
-expiry. Hover or keyboard-focus the expiry for its exact local timestamp.
-Expiry is not a guaranteed deletion date. Missing fields remain unknown.
+The chat section shows reported message capacity and server expiry. Each chat's
+last readings are saved, so they show again in another tab or after a restart.
+Hover or keyboard-focus the expiry for its exact local timestamp. Expiry is not
+a guaranteed deletion date. Missing fields remain unknown.
 
-The extension requests the selected tone; Microsoft controls final routing and
+The extension requests the selected model; Microsoft controls final routing and
 account entitlements. It preserves the existing paid/included connection scenario.
 No automatic model fallback or quota-limit bypass is implemented.
 
-This MVP has been tested with protocol and browser fixtures. Live validation
-in your own signed-in Copilot account is still required.
+This extension has been tested with protocol and browser fixtures. Live
+validation in your own signed-in Copilot account is still required.
 
 Source and technical notes: https://github.com/fishux/M365-Copilot-Extender
