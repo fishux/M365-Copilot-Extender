@@ -4,59 +4,73 @@
   "use strict";
   const core = globalThis.M365ExtenderCore;
   const STALE_MS = 5 * 60 * 1000;
+  const COPILOT_URL = "https://m365.cloud.microsoft/chat";
   const css = `
-    :host { all: initial; color-scheme: light dark; --bg:#fff; --ink:#1c2132;
-      --muted:#697185; --line:#e7e9f0; --soft:#f6f7fb; --accent:#6254d9;
-      --good:#248568; --warn:#b15722; --low:#c96a0a; --critical:#c5221f; font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
+    :host { all: initial; color-scheme: light dark; --bg:#fbfaf6; --bar:#f1efe8; --line:#d8d5cc; --soft:#e2dfd6;
+      --ink:#24292f; --muted:#57606a; --good:#1a7f37; --low:#9a6700; --critical:#cf222e; --accent:#0550ae;
+      --hover:#eef1f5; --current:#e3eaf4; --alert-bg:#fff5f5; --alert-line:#f1b8b8; --warn-bg:#fff8e6; --warn-line:#e8cf8f;
+      font:12px/20px ui-monospace,"SF Mono","Cascadia Mono",Consolas,Menlo,monospace; color:var(--ink); }
     * { box-sizing:border-box; } [hidden] { display:none !important; }
-    .card { width:308px; background:var(--bg); overflow:hidden; }
-    .header { display:flex; align-items:center; gap:8px; padding:14px 14px 10px; }
-    .logo { display:grid; place-items:center; width:28px; height:28px; flex:none; border-radius:9px;
-      color:white; background:linear-gradient(145deg,#8c76ed,#5145bb); box-shadow:0 3px 9px #6254d926; }
-    .logo svg { width:18px; height:18px; }
-    .brand { flex:1; } h2 { margin:0; font-size:14px; font-weight:650; letter-spacing:-.2px; }
-    .eyebrow { font-size:10px; letter-spacing:1.1px; text-transform:uppercase; color:var(--muted); }
-    .body { padding:0 14px 13px; }
-    label.field-label { display:block; margin:0 0 5px; font-size:11px; font-weight:600; color:var(--muted); }
-    .select-wrap { position:relative; } select { display:block; width:100%; min-height:39px;
-      appearance:none; padding:8px 32px 8px 11px; border:1px solid var(--line); border-radius:11px;
-      background:var(--soft); color:var(--ink); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
-    select:disabled { cursor:wait; opacity:.6; } .chevron { position:absolute; right:12px; top:10px; pointer-events:none; color:var(--muted); }
-    select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
-    .hint { display:flex; align-items:center; gap:6px; margin:6px 0 0; font-size:11px; color:var(--muted); }
-    .hint svg { width:12px; height:12px; flex:none; color:var(--accent); }
-    .conversation-model { margin-top:10px; } .conversation-model select { min-height:34px; font-weight:500; }
-    .usage { margin-top:12px; padding:11px; border:1px solid var(--line); border-radius:12px; }
-    .usage-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; }
-    .usage-head strong { font-size:11px; font-weight:600; } .live { font-size:10px; letter-spacing:.3px; text-transform:uppercase; color:var(--good); }
-    .counts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .counts > div + div { border-left:1px solid var(--line); padding-left:11px; }
-    .number { display:block; font-size:24px; line-height:1.2; font-weight:600; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
-    .number.low { color:var(--low); } .number.critical { color:var(--critical); } .period { font-size:10px; color:var(--muted); }
-    .usage-note { margin:7px 0 0; font-size:10px; color:var(--muted); } .pending { margin:0; font-size:11px; color:var(--muted); }
-    .status { display:flex; align-items:flex-start; gap:7px; margin:10px 0 0; font-size:11px; color:var(--muted); }
-    .dot { width:6px; height:6px; margin-top:5px; border-radius:50%; background:#a7aec0; flex:none; }
-    .dot.good { background:var(--good); } .dot.warn { background:var(--warn); }
-    .connection-details { margin-top:9px; padding-top:8px; border-top:1px solid var(--line); }
-    .connection-title { margin:0; color:var(--muted); font-size:10px; font-weight:500; }
-    dl { margin:7px 0 0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:5px 10px; font-size:10px; }
-    dt { color:var(--muted); font-size:10px; } dd { margin:0; overflow-wrap:anywhere; }
-    .disclaimer { margin:8px 0 0; font-size:10px; color:var(--muted); }
-    .error { color:var(--warn); font-size:11px; margin:10px 0 0; }
-    .conversation-info { margin-top:10px; padding-top:9px; border-top:1px solid var(--line); font-size:10px; }
-    .conversation-row { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); }
-    .capacity-count { font-weight:500; font-variant-numeric:tabular-nums; color:var(--ink); }
-    .capacity-count.near-limit { color:var(--warn); }
-    .capacity-track { height:3px; margin:5px 0 6px; border-radius:4px; background:var(--line); overflow:hidden; }
-    .capacity-fill { height:100%; border-radius:4px; background:var(--accent); }
-    .capacity-fill.near-limit { background:var(--warn); }
-    .expiry-row { margin-top:5px; } .expiry-value { color:var(--ink); font-variant-numeric:tabular-nums; }
-    .expiry-value:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    @media(prefers-color-scheme:dark) { :host { --bg:#1c1d25; --ink:#f0f0f7; --muted:#a2a6b8; --line:#353641; --soft:#252631; --accent:#b5a6ff; --good:#76d3af; --warn:#f2b07d; --low:#f7a94f; --critical:#ff8a80; } }
+    button { font:inherit; color:inherit; }
+    button:focus-visible, a:focus-visible, time:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; border-radius:4px; }
+    .card { width:340px; background:var(--bg); }
+    .header { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; background:var(--bar); border-bottom:1px solid var(--line); }
+    .brand { color:var(--accent); } .route { color:var(--muted); }
+    .body { padding:10px 14px 12px; display:flex; flex-direction:column; gap:12px; }
+    .status { display:flex; align-items:flex-start; gap:8px; margin:0; }
+    .dot { width:7px; height:7px; margin-top:7px; border-radius:50%; background:var(--muted); flex:none; }
+    .dot.good { background:var(--good); } .dot.warn { background:var(--low); } .dot.critical { background:var(--critical); }
+    .status.good { color:var(--good); } .status.warn { color:var(--low); } .status.critical { color:var(--critical); }
+    .heading { display:flex; justify-content:space-between; gap:8px; margin:0; font:inherit; color:var(--muted); }
+    .line { display:flex; align-items:center; min-height:20px; } .key { width:84px; flex:none; }
+    .number { width:40px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+    .level { margin-left:12px; } .low { color:var(--low); } .critical { color:var(--critical); } .ok { color:var(--good); }
+    .stale .number, .stale .level { opacity:.7; }
+    .note { margin:0; color:var(--muted); }
+    .models { display:flex; flex-direction:column; margin:2px -6px 0; }
+    .model-row { display:flex; align-items:center; border-radius:4px; }
+    .model-row:hover { background:var(--hover); } .model-row.active { background:var(--current); }
+    .pick { flex:1; min-width:0; display:flex; align-items:center; height:32px; padding:0 6px; border:0; background:none; text-align:left; cursor:pointer; font-size:13px; }
+    .pick:disabled { cursor:wait; }
+    .badge { width:48px; flex:none; color:var(--accent); } .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tag { color:var(--muted); font-size:11px; } .tag.pinned { color:var(--low); }
+    .pin { width:32px; height:32px; flex:none; display:grid; place-items:center; border:0; border-radius:4px; background:none; color:var(--muted); cursor:pointer; opacity:.45; }
+    .model-row:hover .pin, .pin:focus-visible, .pin[aria-pressed="true"] { opacity:1; }
+    .pin:hover:not(:disabled) { background:var(--current); } .pin[aria-pressed="true"] { color:var(--low); }
+    .pin:disabled { cursor:default; opacity:.2; }
+    .pin svg { width:15px; height:15px; } .pin[aria-pressed="true"] path { fill:currentColor; }
+    .chip { height:24px; padding:0 8px; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer; font-size:11px; }
+    .chip:hover { background:var(--hover); } .unpin { margin-left:auto; color:var(--low); }
+    .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit { color:var(--low); }
+    .capacity-track { width:80px; height:8px; margin-right:8px; flex:none; border-radius:2px; background:var(--soft); overflow:hidden; position:relative; }
+    .capacity-track::after { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 7px,var(--bg) 7px 8px); }
+    .capacity-fill { height:100%; background:var(--ink); } .capacity-fill.near-limit { background:var(--low); }
+    .box { padding:8px 10px; border-radius:6px; font-size:11px; line-height:17px; }
+    .alert { border:1px solid var(--alert-line); background:var(--alert-bg); }
+    .alert-title { color:var(--critical); } .alert p { margin:2px 0 8px; }
+    .fallbacks { display:flex; flex-wrap:wrap; gap:6px; } .fallbacks .chip { height:28px; background:var(--bg); }
+    .warning { margin:0; border:1px solid var(--warn-line); background:var(--warn-bg); color:var(--low); }
+    .error { margin:0; color:var(--critical); }
+    .open-copilot { display:flex; align-items:center; justify-content:center; height:34px; border:1px solid var(--line); border-radius:6px; color:var(--accent); text-decoration:none; }
+    .open-copilot:hover { background:var(--hover); }
+    .details { padding:8px 10px; border-radius:6px; background:var(--bar); }
+    dl { margin:4px 0 0; } dl > div { display:flex; align-items:center; min-height:26px; border-bottom:1px dashed var(--line); }
+    dt { width:84px; flex:none; color:var(--muted); } dd { margin:0; flex:1; min-width:0; overflow-wrap:anywhere; }
+    .copy { width:26px; height:26px; flex:none; display:grid; place-items:center; border:0; border-radius:4px; background:none; color:var(--muted); cursor:pointer; }
+    .copy:hover { background:var(--hover); } .copy svg { width:13px; height:13px; }
+    .disclaimer { margin:8px 0 0; font-size:11px; line-height:17px; color:var(--muted); }
+    .footer { display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--line); }
+    .save-label { color:var(--muted); font-size:11px; }
+    .toggle { display:flex; align-items:center; gap:6px; }
+    @media(prefers-color-scheme:dark) { :host { --bg:#0d1117; --bar:#161b22; --line:#30363d; --soft:#21262d; --ink:#e6edf3; --muted:#8b949e;
+      --good:#7ee787; --low:#f2cc60; --critical:#ff7b72; --accent:#79c0ff; --hover:#161e29; --current:#1f2937;
+      --alert-bg:#1d1214; --alert-line:#6e2b2b; --warn-bg:#19160d; --warn-line:#5c4a17; } }
     @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
   `;
-  const logo = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>';
-  const lock = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="7" rx="2" stroke="currentColor"/><path d="M5.5 7V4.5a2.5 2.5 0 015 0V7" stroke="currentColor"/></svg>';
+  const pinIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.6 1.8l4.6 4.6-1.6 1.1-.9-.4-2.6 2.6.4 3-1.2 1.2-2.6-2.6-3.2 3.2-.9-.9 3.2-3.2-2.6-2.6 1.2-1.2 3 .4 2.6-2.6-.4-.9z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+  const copyIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
+  const levelTag = { normal: "[ok]", warn: "[low]", critical: "[crit]" };
+  const levelClass = { normal: "ok", warn: "low", critical: "critical" };
 
   function mount(host, { onSelect, onConversationSelect }) {
     const root = host.attachShadow({ mode: "open" });
@@ -65,87 +79,176 @@
     card.className = "card";
     card.setAttribute("aria-label", "M365 Copilot Extender");
     // This template is static; server and preference values are set with textContent.
-    card.innerHTML = `<header class="header"><span class="logo">${logo}</span><div class="brand"><div class="eyebrow">M365 Copilot</div><h2>Extender</h2></div></header>
-      <div class="body"><label class="field-label" for="model">Default model</label>
-      <div class="select-wrap"><select id="model" disabled></select><span class="chevron" aria-hidden="true">⌄</span></div>
-      <p class="hint">${lock}<span class="save-label">Loading saved preference…</span></p>
-      <div class="conversation-model" hidden><label class="field-label" for="conversation-model">This conversation</label>
-      <div class="select-wrap"><select id="conversation-model" disabled><option value="">Use default</option></select><span class="chevron" aria-hidden="true">⌄</span></div>
-      <p class="hint conversation-hint">Send a message to choose a model for this chat.</p></div>
-      <section class="usage" aria-label="Model usage allowance" hidden><div class="usage-head"><strong>Messages remaining</strong><span class="live">Server reported</span></div>
-      <div class="counts"><div><span class="number daily">—</span><span class="period">Daily allowance</span></div><div><span class="number weekly">—</span><span class="period">Weekly allowance</span></div></div>
-      <p class="pending" hidden>Send a message to check your allowance.</p><p class="usage-note"></p></section>
-      <section class="conversation-info" aria-label="Conversation capacity and expiry" hidden>
-      <div class="conversation-row"><span>Conversation</span><span class="capacity-count">Awaiting reply</span></div>
-      <div class="capacity-track" role="meter" aria-label="Conversation messages used" aria-valuemin="0" hidden><div class="capacity-fill"></div></div>
-      <div class="conversation-row expiry-row"><span>Server expiry</span><time class="expiry-value" tabindex="0">Not reported</time></div></section>
+    card.innerHTML = `<header class="header"><span class="brand">copilot-extender</span><span class="route"></span></header>
+      <div class="body">
       <p class="status" role="status" aria-live="polite"><span class="dot"></span><span class="status-text">Waiting for Copilot</span></p>
       <p class="error" role="alert" hidden></p>
-      <section class="connection-details" aria-label="Connection details"><h3 class="connection-title">Connection details</h3><dl><div><dt>Route</dt><dd class="route">Not observed</dd></div><div><dt>Last request</dt><dd class="requested">Not observed</dd></div><div><dt>Response</dt><dd class="response">Not observed</dd></div><div><dt>Origin</dt><dd class="origin">Not observed</dd></div></dl>
-      <p class="disclaimer">Requests your selected model. Microsoft controls final model routing.</p></section></div>`;
+      <section class="usage" aria-label="Model usage allowance" hidden><h2 class="heading"><span class="usage-title"># allowance</span><span class="usage-age"></span></h2>
+      <div class="counts"><div class="line"><span class="key">daily</span><span class="number daily">—</span><span class="level daily-level"></span></div>
+      <div class="line"><span class="key">weekly</span><span class="number weekly">—</span><span class="level weekly-level"></span></div></div>
+      <p class="note pending" hidden>Send a message to check your allowance.</p></section>
+      <section class="out-of-credits box alert" role="alert" hidden><div class="alert-title">← OutOfCredits on the last request</div>
+      <p>Pin another model to this chat:</p><div class="fallbacks"></div></section>
+      <p class="warning box" hidden></p>
+      <section aria-label="Models"><h2 class="heading"><span># model</span><span>click = default · pin = this chat</span></h2>
+      <div class="models" role="group" aria-label="Default model"></div></section>
+      <section class="conversation-info" aria-label="This conversation" hidden><h2 class="heading"># chat</h2>
+      <div class="line"><span class="key">model</span><span class="chat-model">Send a message to pin a model</span><button type="button" class="chip unpin" hidden>unpin</button></div>
+      <div class="line"><span class="key">capacity</span><span class="capacity-track" role="meter" aria-label="Conversation messages used" aria-valuemin="0" hidden><span class="capacity-fill"></span></span><span class="capacity-count">Awaiting reply</span></div>
+      <div class="line"><span class="key">expiry</span><time class="expiry-value" tabindex="0">Not reported</time></div></section>
+      <section class="no-tab" hidden><p class="note">Readings come from the active Copilot tab.</p></section>
+      <a class="open-copilot" href="${COPILOT_URL}" target="_blank" rel="noopener" hidden>open m365 copilot ↗</a>
+      <section class="details" id="details" aria-label="Connection details" hidden><h2 class="heading"><span># connection</span><button type="button" class="chip copy-all">copy all</button></h2>
+      <dl><div><dt>route</dt><dd class="route-value">Not observed</dd></div><div><dt>request</dt><dd class="requested">Not observed</dd></div>
+      <div><dt>response</dt><dd class="response">Not observed</dd></div><div><dt>origin</dt><dd class="origin">Not observed</dd></div></dl>
+      <p class="disclaimer">Requests your selected model. Microsoft controls final routing; origin doesn't verify the backend model.</p></section>
+      <footer class="footer"><span class="save-label">Loading saved preference…</span>
+      <button type="button" class="chip toggle" aria-expanded="false" aria-controls="details">details <span class="arrow" aria-hidden="true">▾</span></button></footer>
+      </div>`;
     root.append(card);
     /** @type {(selector: string) => HTMLElement} */
     const find = selector => /** @type {HTMLElement} */ (card.querySelector(selector));
-    const select = /** @type {HTMLSelectElement} */ (find("#model"));
-    const conversationSelect = /** @type {HTMLSelectElement} */ (find("#conversation-model"));
+    /** @type {{ tone: string, row: HTMLElement, pick: HTMLButtonElement, tag: HTMLElement, pin: HTMLButtonElement }[]} */
+    const rows = [];
+    let current = { tone: "", conversationTone: /** @type {string | null} */ (null) };
     for (const model of core.MODELS) {
-      for (const target of [select, conversationSelect]) {
-        const option = document.createElement("option"); option.value = model.tone;
-        option.textContent = model.menuLabel;
-        target.append(option);
-      }
+      const row = document.createElement("div"); row.className = "model-row"; row.dataset.tone = model.tone;
+      const pick = document.createElement("button"); pick.type = "button"; pick.className = "pick";
+      const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = `[${model.badge}]`;
+      const name = document.createElement("span"); name.className = "name"; name.textContent = model.menuLabel;
+      const tag = document.createElement("span"); tag.className = "tag";
+      pick.append(badge, name, tag);
+      pick.addEventListener("click", () => onSelect(model.tone));
+      const pin = document.createElement("button"); pin.type = "button"; pin.className = "pin"; pin.innerHTML = pinIcon;
+      // Clicking the pinned model's pin again returns this chat to the default.
+      pin.addEventListener("click", () => onConversationSelect(current.conversationTone === model.tone ? null : model.tone));
+      row.append(pick, pin);
+      find(".models").append(row);
+      rows.push({ tone: model.tone, row, pick, tag, pin });
     }
-    select.addEventListener("change", () => onSelect(select.value));
-    conversationSelect.addEventListener("change", () => onConversationSelect(conversationSelect.value || null));
+    find(".unpin").addEventListener("click", () => onConversationSelect(null));
+    const toggle = find(".toggle");
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      toggle.setAttribute("aria-expanded", String(open));
+      find(".arrow").textContent = open ? "▴" : "▾";
+      find(".details").hidden = !open;
+      // Chrome caps popups at 600px, so the open drawer may need scrolling to.
+      if (open) find(".details").scrollIntoView({ block: "nearest" });
+    });
+    const fields = [["route", ".route-value"], ["request", ".requested"], ["response", ".response"], ["origin", ".origin"]];
+    async function copy(text, button) {
+      try { await navigator.clipboard.writeText(text); } catch { return; }
+      const label = button.getAttribute("aria-label") || button.textContent || "";
+      if (button.classList.contains("copy-all")) button.textContent = "copied";
+      button.setAttribute("aria-label", "Copied");
+      setTimeout(() => {
+        if (button.classList.contains("copy-all")) button.textContent = "copy all";
+        button.setAttribute("aria-label", label);
+      }, 1200);
+    }
+    for (const [label, selector] of fields) {
+      const button = document.createElement("button"); button.type = "button"; button.className = "copy";
+      button.setAttribute("aria-label", `Copy ${label}`); button.innerHTML = copyIcon;
+      button.addEventListener("click", () => copy(find(selector).textContent || "", button));
+      find(selector).after(button);
+    }
+    // Diagnostics hold sanitized connection fields only, never conversation IDs.
+    find(".copy-all").addEventListener("click", event => copy(fields.map(([label, selector]) => `${label}: ${find(selector).textContent}`).join("\n"),
+      /** @type {HTMLButtonElement} */ (event.currentTarget)));
 
     function update(state) {
-      select.value = state.tone;
-      select.disabled = !state.loaded || state.saving;
+      const observed = state.observed || {};
+      const connected = state.connected !== false;
+      // A per-conversation choice overrides the default for this chat.
+      const tone = state.conversationTone || state.tone;
+      current = { tone: state.tone, conversationTone: state.conversationTone };
+      const busy = !state.loaded || state.saving;
+      for (const { tone: rowTone, row, pick, tag, pin } of rows) {
+        const model = core.modelFor(rowTone);
+        const isDefault = rowTone === state.tone, isPinned = rowTone === state.conversationTone;
+        row.classList.toggle("active", rowTone === tone);
+        pick.disabled = busy;
+        pick.setAttribute("aria-pressed", String(isDefault));
+        pick.setAttribute("aria-label", `${model?.label}${isDefault ? ", default" : ""}${isPinned ? ", pinned to this chat" : ""}`);
+        tag.textContent = isDefault && isPinned ? "default · pinned" : isPinned ? "pinned" : isDefault ? "default" : "";
+        tag.classList.toggle("pinned", isPinned);
+        pin.hidden = !connected;
+        pin.disabled = busy || !state.conversation;
+        pin.setAttribute("aria-pressed", String(isPinned));
+        const pinLabel = !state.conversation ? "Send a message to pin a model to this chat"
+          : isPinned ? `Unpin ${model?.label} from this chat` : `Pin ${model?.label} to this chat`;
+        pin.setAttribute("aria-label", pinLabel); pin.title = pinLabel;
+      }
       find(".save-label").textContent = state.saving ? "Saving…" : state.loaded ? "Saved across tabs & restarts" : "Loading saved preference…";
       find(".error").hidden = !state.error;
       find(".error").textContent = state.error || "";
-      const observed = state.observed || {};
-      // A per-conversation choice overrides the default for this chat.
-      const tone = state.conversationTone || state.tone;
-      const conversationBox = find(".conversation-model");
-      conversationBox.hidden = state.connected === false;
-      conversationSelect.value = state.conversationTone || "";
-      conversationSelect.disabled = !state.conversation || !state.loaded || state.saving;
-      /** @type {HTMLOptionElement} */ (conversationSelect.options[0]).textContent = `Use default (${core.modelFor(state.tone)?.label ?? "—"})`;
-      find(".conversation-hint").textContent = state.conversation ? "Applies to this chat only, across tabs & restarts." : "Send a message to choose a model for this chat.";
+
       const quota = core.allowanceFor(tone, observed.metering);
       const model = core.modelFor(tone);
       const knownPaidCap = model?.knownPaidCap && observed.scenario !== "OfficeWebIncludedCopilot";
-      const showUsage = Boolean(quota || knownPaidCap);
-      find(".usage").hidden = !showUsage;
+      find(".usage").hidden = !connected || !(quota || knownPaidCap);
+      find(".usage-title").textContent = `# allowance · ${model?.label ?? "—"}`;
       find(".counts").hidden = !quota;
-      find(".live").hidden = !quota;
       find(".pending").hidden = Boolean(quota);
       find(".pending").textContent = observed.quotaAt ? "Copilot did not report this allowance." : "Send a message to check your allowance.";
+      const stale = Boolean(quota && observed.quotaAt && Date.now() - observed.quotaAt > STALE_MS);
+      find(".usage").classList.toggle("stale", stale);
+      find(".usage-age").textContent = quota && observed.quotaAt
+        ? `${stale ? "last known" : "updated"} ${new Date(observed.quotaAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
       for (const period of ["daily", "weekly"]) {
         const value = quota?.[period];
-        find(`.${period}`).textContent = value === null || value === undefined ? "—" : String(value);
-        const level = core.allowanceLevel(typeof value === "number" ? value : null);
+        const known = typeof value === "number";
+        const level = core.allowanceLevel(known ? value : null);
+        find(`.${period}`).textContent = known ? String(value) : "—";
         find(`.${period}`).classList.toggle("low", level === "warn");
         find(`.${period}`).classList.toggle("critical", level === "critical");
+        find(`.${period}-level`).textContent = known ? levelTag[level] : "";
+        find(`.${period}-level`).className = `level ${period}-level ${known ? levelClass[level] : ""}`;
       }
-      const age = observed.quotaAt ? Date.now() - observed.quotaAt : 0;
-      find(".usage-note").textContent = quota ? `${age > STALE_MS ? "Last known · " : "Updated "}${new Date(observed.quotaAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Refreshes after a reply` : "Allowances appear when Copilot reports them.";
-      let text = state.connected === false ? "Open Copilot to see connection and usage details." : "Ready for your next message";
+
+      let text = connected ? "Ready for your next message" : "No Copilot tab · preferences can still be changed";
       let status = "";
-      if (state.connected !== false && !state.hookReady) { text = "Connecting to Copilot…"; }
+      if (connected && !state.hookReady) text = "Connecting to Copilot…";
       if (observed.appliedTone === tone) { text = "Preference applied to the last request"; status = "good"; }
-      if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "warn"; }
+      if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "critical"; }
       else if (observed.result && observed.result !== "Success") { text = `Copilot response: ${observed.result}`; status = "warn"; }
-      if (observed.warning) { text = observed.warning; status = "warn"; }
       find(".status-text").textContent = text;
       find(".dot").className = `dot ${status}`;
-      find(".route").textContent = observed.scenario === "OfficeWebPaidCopilot" ? "Paid Copilot" : observed.scenario === "OfficeWebIncludedCopilot" ? "Included Copilot" : "Not observed";
+      find(".status").className = `status ${status}`;
+      find(".warning").hidden = !observed.warning;
+      find(".warning").textContent = observed.warning || "";
+
+      // No automatic fallback: offer one-click pins to the other models instead.
+      const outOfCredits = connected && observed.result === "OutOfCredits" && Boolean(state.conversation);
+      find(".out-of-credits").hidden = !outOfCredits;
+      const fallbacks = find(".fallbacks");
+      if (outOfCredits && fallbacks.dataset.tone !== tone) {
+        fallbacks.dataset.tone = tone;
+        fallbacks.replaceChildren(...core.MODELS.filter(other => other.tone !== tone).map(other => {
+          const button = document.createElement("button"); button.type = "button"; button.className = "chip";
+          button.textContent = `[${other.badge}]`;
+          button.setAttribute("aria-label", `Pin ${other.label} to this chat`);
+          button.addEventListener("click", () => onConversationSelect(other.tone));
+          return button;
+        }));
+      }
+
+      const scenario = observed.scenario === "OfficeWebPaidCopilot" ? "Paid Copilot" : observed.scenario === "OfficeWebIncludedCopilot" ? "Included Copilot" : "";
+      find(".route").textContent = scenario ? scenario.split(" ")[0].toLowerCase() : "";
+      find(".route-value").textContent = scenario || "Not observed";
       find(".requested").textContent = core.modelFor(observed.appliedTone)?.label || "Not observed";
       find(".response").textContent = observed.result || "Not observed";
       find(".origin").textContent = observed.origin || "Not observed";
+
+      find(".no-tab").hidden = connected;
+      find(".open-copilot").hidden = connected;
+      find(".conversation-info").hidden = !connected;
+      const defaultLabel = core.modelFor(state.tone)?.label ?? "—";
+      find(".chat-model").textContent = !state.conversation ? `default → ${defaultLabel}`
+        : state.conversationTone ? `pinned → ${core.modelFor(state.conversationTone)?.label}` : `default → ${defaultLabel}`;
+      find(".unpin").hidden = !state.conversationTone || !state.conversation;
       const conversation = core.conversationView(observed.conversation, observed.expiresAt);
-      find(".conversation-info").hidden = state.connected === false;
       find(".capacity-count").textContent = conversation.capacity;
       find(".capacity-count").title = conversation.capacityTitle;
       find(".capacity-count").classList.toggle("near-limit", conversation.nearLimit);

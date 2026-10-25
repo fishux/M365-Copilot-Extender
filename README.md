@@ -4,7 +4,7 @@ A lightweight Chrome Manifest V3 extension for persistent model selection in [Mi
 
 Choose a default model once using the Chrome toolbar popup. Your choice applies to outgoing chat requests across Copilot tabs and survives browser restarts. GPT-6.1 Sol is the initial default. You can also pin a different model to an individual conversation.
 
-The toolbar icon shows which model the current tab is using and turns orange, then red, as that model's remaining allowance runs low. The popup supports system light/dark appearance, keyboard navigation, and always-visible connection details. Nothing is displayed over the Copilot page. See the [changelog](CHANGELOG.md) for what's new.
+The toolbar icon shows which model the current tab is using and turns orange, then red, as that model's remaining allowance runs low. The popup lists every model on one screen in a compact console style: click a row to set the default, or its pin to use that model for the current chat only. It follows the system light/dark appearance, and connection details sit in an expandable drawer. Nothing is displayed over the Copilot page. See the [changelog](CHANGELOG.md) for what's new.
 
 ## Install on Windows
 
@@ -50,7 +50,7 @@ Counters show **remaining messages** reported by Copilot, refreshed after a resp
 - Allowances are per account, so they stay visible when you switch to another conversation in the same tab.
 - Readings are kept **in memory in each tab**. The popup reads the active Copilot tab; opening it on another website still lets you change preferences, but shows no connection data. Send a message in a new or reloaded Copilot tab to obtain its readings. Old readings are marked **Last known** after five minutes; they refresh only with a new response.
 
-Connection details show the observed scenario, the last requested model, result code, and known content origin.
+The status line at the top of the popup shows whether your preference was applied to the last request, or the last error. The **details** drawer shows the observed scenario, the last requested model, result code, and known content origin, each with a copy button; **copy all** copies only those fields, never conversation IDs. If a request reaches a usage limit, the popup offers one-click buttons to pin another model to the chat; it never switches automatically.
 
 ## Conversation capacity and expiry
 
@@ -63,9 +63,9 @@ These readings belong to the conversation shown in the page. Each conversation k
 
 ## Per-conversation model
 
-Below the default model, **This conversation** lets you pin a different model to the chat you're viewing. **Use default** removes the pin. The choice applies to every later turn in that conversation, in any tab, and survives restarts; other conversations keep using the default.
+Each model row has a pin button that pins that model to the chat you're viewing. Click the filled pin again, or **unpin** in the chat section, to return the chat to the default. The choice applies to every later turn in that conversation, in any tab, and survives restarts; other conversations keep using the default.
 
-- The selector becomes available once the conversation has an ID: after its first message is sent, or when you open an existing chat from the sidebar.
+- Pins become available once the conversation has an ID: after its first message is sent, or when you open an existing chat from the sidebar.
 - Conversations are identified by the `ConversationId` that Copilot's own client attaches to its Chathub connection (and shows in `/chat/conversation/<id>` URLs). Only a SHA-256 hash of that ID is saved, together with the model and a timestamp; the 200 most recent choices are kept.
 - Before the first chat request on a connection, the hook briefly waits for that conversation's choice, as it already does for the default. If it never arrives within 1.5 seconds, the default model is used and a warning is shown.
 - Copilot's own picker also stores a model per conversation on the server. The extension overrides what is sent; it does not change what Copilot's picker displays.
@@ -99,7 +99,7 @@ For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and 
 
 GitHub Actions runs `npm run check`, `npm test` and `npm run typecheck` on Node 20, 22 and 24 for every pull request and push to `main` ([workflow](.github/workflows/ci.yml)). The browser preview checks are still run by hand.
 
-Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab preference propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. The browser fixture checks the toolbar selectors, usage states and colours, the conversation override, active-tab readings, and absence of injected page controls.
+Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab preference propagation, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. The browser fixture checks the model rows and pins, usage states and colours, the conversation override, active-tab readings, and absence of injected page controls.
 
 **Live account validation remains required.** These checks establish extension behavior against fixtures; they do not establish current Microsoft availability, backend identity, or account-specific quota policies. No Microsoft account credentials are needed for the test suite.
 
@@ -113,7 +113,7 @@ No upstream implementation has been incorporated.
 
 ## Troubleshooting startup errors
 
-If the badge or per-conversation selector doesn't appear after updating, reload the extension at `chrome://extensions` and then reload every open Copilot tab: the page hook only attaches when the page loads.
+If the badge or per-conversation pins don't appear after updating, reload the extension at `chrome://extensions` and then reload every open Copilot tab: the page hook only attaches when the page loads.
 
 Since v0.1.7 the runtime scripts are self-contained. This removes the separate shared-core loading dependency implicated by a reported `Cannot read properties of undefined (reading DEFAULT_TONE)` error. The exact reason the old shared script was unavailable in that installation remains unconfirmed. New startup tests execute the actual packaged scripts without a global core. Live validation remains necessary.
 

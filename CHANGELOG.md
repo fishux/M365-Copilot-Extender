@@ -2,6 +2,16 @@
 
 All notable changes to M365 Copilot Extender. Versions match `extension/manifest.json`.
 
+## Unreleased
+
+### Changed
+- **Console-style popup.** All six models are listed on one screen. Click a row to set the default; click its pin to use that model for the current chat only, and click again (or **unpin**) to remove it. The dropdowns are gone.
+- A status line at the top of the popup shows whether the preference was applied to the last request, or the last error. Hook warnings appear in their own box.
+- Connection details moved into a **details** drawer with per-field copy buttons and **copy all** (route, request, response and origin only).
+- When a request reaches a usage limit, the popup offers one-click pins to the other models. There is still no automatic fallback.
+- Outside Copilot the popup links to M365 Copilot; preferences can still be changed.
+- Light and dark themes follow the system setting. The popup is 340px wide with 32px model rows.
+
 ## 0.2.0 — 2026-10-25
 
 ### Added
