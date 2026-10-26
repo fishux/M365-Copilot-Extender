@@ -100,6 +100,7 @@ interface PopupState {
   error: string;
   observed: Observed & { metering?: Record<string, number>; quotaAt?: number; scenario?: string };
   conversation: { key: string } | null;
+  newChat: { tone: string | null } | null;
   conversationTone: string | null;
 }
 

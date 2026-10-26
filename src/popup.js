@@ -6,6 +6,7 @@
   const state = { tone: core.DEFAULT_TONE, loaded: false, saving: false,
     connected: false, hookReady: false, error: "", observed: {},
     /** @type {{ key: string } | null} */ conversation: null,
+    /** An unsent new chat; its model is chosen before it has a conversation. @type {{ tone: string | null } | null} */ newChat: null,
     /** @type {string | null} */ conversationTone: null };
   /** @type {ConversationTones} */
   let conversationTones = {};
@@ -33,7 +34,7 @@
    */
   function saveConversation(tone) {
     const key = state.conversation?.key;
-    if (!key) return;
+    if (!key) return state.newChat ? chooseForNewChat(tone) : undefined;
     const model = core.modelFor(tone);
     const next = { ...conversationTones };
     if (model && model.tone !== core.DEFAULT_TONE) next[key] = { tone: model.tone, at: Date.now() };
@@ -41,9 +42,21 @@
     const recent = Object.entries(next).sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS);
     return save({ conversationTones: Object.fromEntries(recent) });
   }
+  /** @param {string | null} tone */
+  async function chooseForNewChat(tone) {
+    state.saving = true; state.error = ""; render();
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const reply = await chrome.tabs.sendMessage(/** @type {number} */ (tab.id), { type: "M365_EXTENDER_NEW_CHAT_TONE", tone });
+      if (!reply?.ok) throw new Error("rejected");
+      await readTab();
+    } catch { state.error = "Could not change the model. Reload Copilot and try again."; }
+    finally { state.saving = false; render(); }
+  }
   function refreshConversation() {
     const key = state.conversation?.key;
-    state.conversationTone = (key && core.modelFor(conversationTones[key]?.tone)?.tone) || null;
+    state.conversationTone = (key && core.modelFor(conversationTones[key]?.tone)?.tone)
+      || (!key && core.modelFor(state.newChat?.tone)?.tone) || null;
   }
   /** Tab readings, with allowances from storage when they are newer (or the tab has none). */
   function refreshObserved() {
@@ -85,7 +98,8 @@
       state.connected = true; state.hookReady = snapshot.hookReady;
       tabObserved = snapshot.observed || {};
       state.conversation = typeof snapshot.conversation?.key === "string" ? { key: snapshot.conversation.key } : null;
-    } catch { state.connected = false; state.hookReady = false; tabObserved = {}; state.conversation = null; }
+      state.newChat = snapshot.newChat && typeof snapshot.newChat === "object" ? { tone: typeof snapshot.newChat.tone === "string" ? snapshot.newChat.tone : null } : null;
+    } catch { state.connected = false; state.hookReady = false; tabObserved = {}; state.conversation = null; state.newChat = null; }
     refreshConversation();
     refreshObserved();
     render();

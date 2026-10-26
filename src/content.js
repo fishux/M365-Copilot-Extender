@@ -40,6 +40,12 @@
   let persistTimer = null;
   /** @type {string | null} */
   let activeSlot = null;
+  // A model chosen for a new chat before its first message. A new chat has no
+  // conversation yet, so the choice waits here and is saved once the chat is sent.
+  /** @type {{ tone: string | null } | null} */
+  let pendingChoice = null;
+  /** Conversation IDs seen on connections while the page showed an unsent new chat. */
+  const newChatIds = new Set();
   const revisions = { conversationTones: 0, usage: 0, conversationReadings: 0 };
   let lastPublished = "";
 
@@ -124,7 +130,20 @@
     if (!state.loaded && !state.failed) return;
     const key = keys.get(id);
     if (!key && !state.failed) return;
-    post({ kind: "conversation", conversationId: id, tone: (key && state.conversationTones[key]?.tone) || null });
+    const saved = key && state.conversationTones[key]?.tone;
+    const chosen = pendingChoice && newChatIds.has(id) ? pendingChoice.tone : null;
+    post({ kind: "conversation", conversationId: id, tone: saved || chosen || null });
+  }
+
+  /** Save a new chat's pre-send choice under its conversation once the chat is sent. */
+  function adoptPendingChoice(id) {
+    const choice = pendingChoice, key = keys.get(id);
+    if (!choice || !newChatIds.has(id)) return;
+    pendingChoice = null;
+    if (!key || !choice.tone || choice.tone === core.DEFAULT_TONE) return;
+    const tones = newest({ ...state.conversationTones, [key]: { tone: choice.tone, at: Date.now() } });
+    chrome.storage.local.set({ conversationTones: tones }).catch(() => { /* This tab keeps the choice for the session. */ });
+    state.conversationTones = tones;
   }
 
   function noteLocation() {
@@ -146,6 +165,7 @@
   }
 
   function effectiveTone(name) {
+    if (!name && pendingChoice) return pendingChoice.tone || core.DEFAULT_TONE;
     const key = isConversation(name) ? keys.get(name) : undefined;
     return (key && state.conversationTones[key]?.tone) || core.DEFAULT_TONE;
   }
@@ -161,7 +181,8 @@
     delete observed.at;
     observed.warning = live?.warning || state.tabWarning;
     if (!observed.warning) delete observed.warning;
-    return { hookReady: state.hookReady, observed, conversation: key ? { key } : null };
+    return { hookReady: state.hookReady, observed, conversation: key ? { key } : null,
+      newChat: name ? null : { tone: pendingChoice?.tone || null } };
   }
 
   // Keep the toolbar badge and icon in step with this tab.
@@ -188,11 +209,14 @@
       // their conversation until a chat is actually sent on it.
       account.scenario = core.safeScenario(message.scenario);
       const id = core.safeConversationId(message.conversationId);
+      if (id && !sentSlots.has(id) && !core.conversationFromPath(location.pathname)) newChatIds.add(id);
       if (id) { if (keys.has(id)) answerHook(id); else ensureKey(id); }
     } else if (message.kind === "request" || (message.kind === "applied" && core.modelFor(message.tone))) {
       const name = slotName(message);
       activeSlot = name;
       sentSlots.add(name);
+      adoptPendingChoice(name);
+      newChatIds.delete(name);
       const observed = slot(name);
       if (message.kind === "applied") { observed.appliedTone = core.modelFor(message.tone)?.tone; touch(name); }
       account.scenario = core.safeScenario(message.scenario);
@@ -289,14 +313,30 @@
     publishTab();
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (sender.id !== chrome.runtime.id || message?.type !== "M365_EXTENDER_SNAPSHOT") return;
-    respond(snapshot());
+    if (sender.id !== chrome.runtime.id) return;
+    if (message?.type === "M365_EXTENDER_SNAPSHOT") respond(snapshot());
+    else if (message?.type === "M365_EXTENDER_NEW_CHAT_TONE") {
+      // Only an unsent new chat can take a choice before it has a conversation.
+      const ok = currentSlot() === null && (message.tone === null || !!core.modelFor(message.tone));
+      if (ok) {
+        pendingChoice = { tone: core.modelFor(message.tone)?.tone ?? null };
+        for (const id of newChatIds) answerHook(id);
+        publishTab();
+      }
+      respond({ ok });
+    }
   });
   // Single-page navigation (sidebar conversations) changes the current conversation.
   // The worker resets a tab's badge when it starts loading, so re-send after
   // navigation settles rather than relying on the de-duplicated state.
   const republish = () => setTimeout(() => publishTab(true), 300);
-  try { /** @type {any} */ (window).navigation?.addEventListener("currententrychange", republish); } catch { /* Older Chrome. */ }
+  // Moving to another conversation abandons a choice made for the unsent new chat.
+  const abandonChoice = () => {
+    const id = core.conversationFromPath(location.pathname);
+    if (id && !newChatIds.has(id)) { pendingChoice = null; newChatIds.clear(); }
+    republish();
+  };
+  try { /** @type {any} */ (window).navigation?.addEventListener("currententrychange", abandonChoice); } catch { /* Older Chrome. */ }
   window.addEventListener("pageshow", republish);
 
   const initialRevisions = { ...revisions };

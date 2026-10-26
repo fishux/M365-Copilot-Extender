@@ -65,7 +65,7 @@ These readings belong to the conversation shown in the page. Each conversation k
 
 Every chat starts on the default, GPT-6 Sol. Click another model's row in the popup and the chat you're viewing uses it for every later turn, in any tab, and across restarts; other conversations are unaffected. Clicking the default's row returns the chat to the default. Chats that were never switched always follow the default, so if a future version changes the default they follow it too.
 
-- Switching becomes available once the conversation has an ID: after its first message is sent, or when you open an existing chat from the sidebar.
+- Switching is available immediately, including on a new chat before its first message: the choice is held by the tab and applied to, and saved with, the chat when the first message is sent. Picking a model on a new chat that is later abandoned is simply forgotten.
 - Conversations are identified by the `ConversationId` that Copilot's own client attaches to its Chathub connection (and shows in `/chat/conversation/<id>` URLs). Only a SHA-256 hash of that ID is saved, together with the model and a timestamp. The 2,000 most recently used chats keep their choice and readings; older entries are dropped.
 - Before the first chat request on a connection, the hook briefly waits for that conversation's choice. If it never arrives within 1.5 seconds, the default model is used and a warning is shown.
 - Copilot's own picker also stores a model per conversation on the server. The extension overrides what is sent; it does not change what Copilot's picker displays.

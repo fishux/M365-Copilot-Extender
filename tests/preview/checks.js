@@ -15,7 +15,7 @@ document.getElementById('checks').addEventListener('click', async () => {
     check(!copilot.document.querySelector('m365-copilot-extender'), 'No extension UI injected into Copilot');
     check(!popupRoot.querySelector('input, select, .collapse, .settings, .pin, .copy, .copy-all, .out-of-credits'), 'No dropdowns, pins, copy or out-of-credits controls');
     check(popupRoot.querySelectorAll('.model-row').length === 6, 'Six models always visible');
-    check(popupRoot.querySelector('.models').classList.contains('locked') && row('Gpt_6_Sol_Reasoning').classList.contains('active'), 'A new chat starts on the default and cannot be switched before its first message');
+    check(!popupRoot.querySelector('.models').classList.contains('locked') && row('Gpt_6_Sol_Reasoning').classList.contains('active'), 'A new chat starts on the default and can be switched before its first message');
     copilot.simulateReply(); await pause(1600);
     check(wire().includes('Gpt_6_Sol_Reasoning'), 'First message uses the GPT-6 Sol default');
     check(status() === 'Last request sent via GPT-6 Sol', 'Success status names the model');
