@@ -2,6 +2,10 @@
 
 All notable changes to M365 Copilot Extender. Versions match `extension/manifest.json`.
 
+## Unreleased
+
+- **Pick a model on a new chat before sending.** The popup no longer stays locked until the first message; the choice is applied to that first message and saved with the chat.
+
 ## 0.3.1 — 2026-10-25
 
 - Refreshed the install notes (`INSTALL.txt`), README, architecture notes and manifest description, which still described the old default selector, pins and GPT-6.1 Sol default.

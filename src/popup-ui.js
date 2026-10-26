@@ -125,9 +125,10 @@
       const connected = state.connected !== false;
       // A chat's own selection overrides the default; new chats start on the default.
       const tone = state.conversationTone || state.tone;
-      const locked = !state.loaded || state.saving || !state.conversation;
+      const selectable = !!(state.conversation || state.newChat);
+      const locked = !state.loaded || state.saving || !selectable;
       find(".models").classList.toggle("locked", locked);
-      find(".models-hint").textContent = state.conversation ? "click to switch" : connected ? "new chat: send a message first" : "open a chat to switch";
+      find(".models-hint").textContent = selectable ? "click to switch" : "open a chat to switch";
       for (const { tone: rowTone, row, pick, mark, tag } of rows) {
         const model = core.modelFor(rowTone);
         const isDefault = rowTone === state.tone, isActive = rowTone === tone;
@@ -136,7 +137,7 @@
         pick.disabled = locked;
         pick.setAttribute("aria-checked", String(isActive));
         pick.setAttribute("aria-label", `${model?.label}${isDefault ? ", default" : ""}`);
-        pick.title = state.conversation ? `Use ${model?.label} in this chat from now on` : "Send a message in a chat to choose its model";
+        pick.title = selectable ? `Use ${model?.label} in this chat from now on` : "Open a chat to choose its model";
         tag.textContent = isDefault ? "default" : isActive ? "this chat" : "";
         tag.classList.toggle("selected", isActive && !isDefault);
       }

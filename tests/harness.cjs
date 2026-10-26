@@ -69,6 +69,7 @@ function environment(store = createStore(), { bundled = false, pathname = '/chat
     if (bundled) loadBundle(isolated, 'content.js');
     else { load(isolated, 'core.js'); load(isolated, 'content.js'); }
     isolated.snapshot = () => { let result; snapshotListener({ type: 'M365_EXTENDER_SNAPSHOT' }, { id: store.chrome.runtime.id }, value => { result = clone(value); }); return result; };
+    isolated.send = message => { let result; snapshotListener(message, { id: store.chrome.runtime.id }, value => { result = clone(value); }); return result; };
     contents.push(isolated);
     return isolated;
   }
