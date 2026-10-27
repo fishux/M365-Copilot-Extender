@@ -79,4 +79,16 @@ Findings for the models this extension offers:
 - **GPT-5.6** has no observed key and no direct observation either way.
 - **Included-scenario** turns carry no `metering` map at all.
 
-Not done: the Claude tones are not offered by this extension. Opus's weekly key would need an explicit key name in `models.json` (its suffix is `75`, not `Weekly`) if Claude models are added later.
+Not done: the Claude tones are not offered by this extension.
+
+## Work IQ capture, 27 October 2026
+
+Owner's sanitized capture of outgoing chat requests (extension disabled, paid account, GPT-6 Sol then Auto chosen in Copilot's picker): structure only, no prompt text, tokens or IDs.
+
+- Work IQ replaced the Work/Web toggle in mid-2026 (third-party write-ups; Microsoft's support pages describe the switch but not the protocol). Switching it starts a new chat.
+- **Off:** Chathub URL `agent=web`, `scenario=OfficeWebPaidCopilot`; no `gpts`; `clientPreferences.executionControls` empty.
+- **On:** `agent=work`, `scenario=officeweb`; `gpts: [{ id: "bizchat-as-gpt-scenario", source: "BuiltInAgents", clientOverrides: { capabilities: GraphConnectors (tenant connections), WebSearch, WorkSearch } }]`; matching `executionControls`; 17 `enterprise_*`/plugin `optionsSets` added and 7 removed; a few URL `variants` differ.
+- **The model still travels in `tone`.** GPT-6 Sol sent `Gpt_6_Sol_Chat` in both modes (not the `Gpt_6_Sol_Reasoning` this extension sends); Auto sent `Magic`.
+- `bizchat-as-gpt-scenario` appears as the built-in `DeclarativeCopilot` agent in HEXUXIU/M365-Copilot2API's HAR notes (`docs/har-mining/02-hidden-endpoints.md`). The cramt proxy found an attached agent overrides non-default and `*_Reasoning` tones with GPT-5, which matches the reported Work IQ symptom.
+
+Out of scope by decision (27 October 2026): Work IQ tones for GPT-6.1 Sol, GPT-6, GPT-5.6 and GPT-5.5. Only GPT-6 Sol is supported with Work IQ; the others fall back to it. Still open: whether `Gpt_6_Sol_Chat` has replaced `Gpt_6_Sol_Reasoning` outside Work IQ. Copilot's picker shows the same model list with Work IQ on and off. Opus's weekly key would need an explicit key name in `models.json` (its suffix is `75`, not `Weekly`) if Claude models are added later.

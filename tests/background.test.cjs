@@ -65,6 +65,16 @@ test('tab badge resets when the tab navigates and ignores foreign or malformed m
   assert.equal(env.last('setBadgeBackgroundColor', 5).color, '#6254d9');
 });
 
+test('a Work IQ tab adds W to the badge and its tooltip', async () => {
+  const env = worker(); await settle();
+  env.send({ type: 'M365_EXTENDER_TAB', tone: 'Gpt_6_Sol_Reasoning', remaining: null, workIQ: true }); await settle();
+  assert.equal(env.last('setBadgeText', 5).text, '6SW');
+  assert.match(env.last('setTitle', 5).title, /GPT-6 Sol · Work IQ$/);
+  // Only a literal true counts; anything else is a normal tab.
+  env.send({ type: 'M365_EXTENDER_TAB', tone: 'Gpt_6_Sol_Reasoning', remaining: null, workIQ: 'yes' }); await settle();
+  assert.equal(env.last('setBadgeText', 5).text, '6S');
+});
+
 test('every model has a badge and the packaged bundle carries models.json in order', () => {
   const bundle = fs.readFileSync(path.join(__dirname, '../extension/background.js'), 'utf8');
   assert.ok(bundle.includes(`shared.models = ${JSON.stringify(models)};`));

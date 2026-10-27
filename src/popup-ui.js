@@ -21,6 +21,7 @@
     .dot { width:7px; height:7px; margin-top:7px; border-radius:50%; background:var(--muted); flex:none; }
     .dot.good { background:var(--good); } .dot.warn { background:var(--low); } .dot.critical { background:var(--critical); }
     .status.good { color:var(--good); } .status.warn { color:var(--low); } .status.critical { color:var(--critical); }
+    .wiq { flex:none; margin-left:auto; color:var(--accent); font-size:11px; cursor:default; }
     .heading { display:flex; justify-content:space-between; gap:8px; margin:0; font:inherit; color:var(--muted); }
     .line { display:flex; align-items:center; min-height:20px; } .key { width:84px; flex:none; }
     .number { width:40px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
@@ -33,6 +34,7 @@
     .pick { flex:1; min-width:0; display:flex; align-items:center; height:32px; padding:0 6px; border:0; background:none; text-align:left; cursor:pointer; font-size:13px; }
     .pick:disabled { cursor:default; } .models.locked .model-row:not(.active) { opacity:.6; }
     .models.locked .model-row:hover { background:none; } .models.locked .model-row.active:hover { background:var(--current); }
+    .model-row.no-work-iq .pick { opacity:.5; }
     .mark { width:14px; flex:none; color:var(--good); }
     .badge { width:48px; flex:none; color:var(--accent); } .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .tag { color:var(--muted); font-size:11px; } .tag.selected { color:var(--low); }
@@ -70,7 +72,7 @@
     // This template is static; server and saved values are set with textContent.
     card.innerHTML = `<header class="header"><span class="brand">copilot-extender</span><span class="route"></span></header>
       <div class="body">
-      <p class="status" role="status" aria-live="polite"><span class="dot"></span><span class="status-text">Waiting for Copilot</span></p>
+      <p class="status" role="status" aria-live="polite"><span class="dot"></span><span class="status-text">Waiting for Copilot</span><span class="wiq" title="Sent through Copilot's Work IQ agent, which can use your Teams, Outlook and SharePoint content" hidden>[work iq]</span></p>
       <p class="error" role="alert" hidden></p>
       <section class="usage" aria-label="Model usage allowance" hidden><h2 class="heading"><span class="usage-title"># allowance</span><span class="usage-age"></span></h2>
       <div class="counts"><div class="line"><span class="key">daily</span><span class="number daily">—</span><span class="level daily-level"></span></div>
@@ -86,7 +88,7 @@
       <section class="no-tab" hidden><p class="note">Readings come from the active Copilot tab.</p></section>
       <a class="open-copilot" href="${COPILOT_URL}" target="_blank" rel="noopener" hidden>open m365 copilot ↗</a>
       <section class="details" id="details" aria-label="Connection details" hidden><h2 class="heading"># connection</h2>
-      <dl><div><dt>route</dt><dd class="route-value">Not observed</dd></div><div><dt>request</dt><dd class="requested">Not observed</dd></div>
+      <dl><div><dt>route</dt><dd class="route-value">Not observed</dd></div><div><dt>work iq</dt><dd class="work-iq">Not observed</dd></div><div><dt>request</dt><dd class="requested">Not observed</dd></div>
       <div><dt>response</dt><dd class="response">Not observed</dd></div><div><dt>origin</dt><dd class="origin">Not observed</dd></div></dl>
       <p class="disclaimer">Requests your selected model. Microsoft controls final routing; origin doesn't verify the backend model.</p></section>
       <footer class="footer"><span class="save-label">Loading saved choices…</span>
@@ -125,19 +127,29 @@
       const connected = state.connected !== false;
       // A chat's own selection overrides the default; new chats start on the default.
       const tone = state.conversationTone || state.tone;
+      const model = core.modelFor(tone);
+      // Work IQ chats send each model's Work IQ tone; models without one use the default.
+      const workIQ = observed.workIQ === true;
+      const defaultLabel = core.modelFor(state.tone)?.label;
+      const sent = core.requestFor(tone, workIQ)?.model ?? model;
       const selectable = !!(state.conversation || state.newChat);
       const locked = !state.loaded || state.saving || !selectable;
       find(".models").classList.toggle("locked", locked);
       find(".models-hint").textContent = selectable ? "click to switch" : "open a chat to switch";
       for (const { tone: rowTone, row, pick, mark, tag } of rows) {
-        const model = core.modelFor(rowTone);
+        const rowModel = core.modelFor(rowTone);
         const isDefault = rowTone === state.tone, isActive = rowTone === tone;
+        const noWorkIQ = workIQ && !rowModel?.workIQTone;
         row.classList.toggle("active", isActive);
+        // Work IQ supports GPT-6 Sol only; other models are dimmed, not hidden.
+        row.classList.toggle("no-work-iq", noWorkIQ);
         mark.textContent = isActive ? "›" : "";
         pick.disabled = locked;
         pick.setAttribute("aria-checked", String(isActive));
-        pick.setAttribute("aria-label", `${model?.label}${isDefault ? ", default" : ""}`);
-        pick.title = selectable ? `Use ${model?.label} in this chat from now on` : "Open a chat to choose its model";
+        pick.setAttribute("aria-label", `${rowModel?.label}${isDefault ? ", default" : ""}${noWorkIQ ? ", not available with Work IQ" : ""}`);
+        pick.title = !selectable ? "Open a chat to choose its model"
+          : noWorkIQ ? `${rowModel?.label} has no Work IQ version; this Work IQ chat would use ${defaultLabel}`
+          : `Use ${rowModel?.label} in this chat from now on`;
         tag.textContent = isDefault ? "default" : isActive ? "this chat" : "";
         tag.classList.toggle("selected", isActive && !isDefault);
       }
@@ -145,12 +157,11 @@
       find(".error").hidden = !state.error;
       find(".error").textContent = state.error || "";
 
-      const quota = core.allowanceFor(tone, observed.metering);
-      const model = core.modelFor(tone);
-      const knownPaidCap = model?.knownPaidCap && observed.scenario !== "OfficeWebIncludedCopilot";
+      const quota = core.allowanceFor(sent?.tone, observed.metering);
+      const knownPaidCap = sent?.knownPaidCap && observed.scenario !== "OfficeWebIncludedCopilot";
       // Allowances are saved across tabs, so they show even outside Copilot.
       find(".usage").hidden = !(quota || (connected && knownPaidCap));
-      find(".usage-title").textContent = `# allowance · ${model?.label ?? "—"}`;
+      find(".usage-title").textContent = `# allowance · ${sent?.label ?? "—"}`;
       find(".counts").hidden = !quota;
       find(".pending").hidden = Boolean(quota);
       find(".pending").textContent = observed.quotaAt ? "Copilot did not report this allowance." : "Send a message to check your allowance.";
@@ -175,20 +186,24 @@
       const applied = core.modelFor(observed.appliedTone);
       if (connected && applied) {
         text = `Last request sent via ${applied.label}`;
-        if (applied.tone !== tone) text += ` · next: ${model?.label}`;
+        if (applied.tone !== sent?.tone) text += ` · next: ${sent?.label}`;
         status = "good";
       }
       if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "critical"; }
       else if (observed.result && observed.result !== "Success") { text = `Copilot response: ${observed.result}`; status = "warn"; }
       find(".status-text").textContent = text;
+      // A quiet tag, like the model badges, when the last request went through Work IQ.
+      find(".wiq").hidden = !(connected && applied && workIQ);
       find(".dot").className = `dot ${status}`;
       find(".status").className = `status ${status}`;
       find(".warning").hidden = !observed.warning;
       find(".warning").textContent = observed.warning || "";
 
-      const scenario = observed.scenario === "OfficeWebPaidCopilot" ? "Paid Copilot" : observed.scenario === "OfficeWebIncludedCopilot" ? "Included Copilot" : "";
-      find(".route").textContent = scenario ? scenario.split(" ")[0].toLowerCase() : "";
+      const scenario = { OfficeWebPaidCopilot: "Paid Copilot", OfficeWebIncludedCopilot: "Included Copilot", officeweb: "Work IQ" }[observed.scenario || ""] || "";
+      find(".route").textContent = scenario ? (workIQ ? "work iq" : scenario.split(" ")[0].toLowerCase()) : "";
       find(".route-value").textContent = scenario || "Not observed";
+      find(".work-iq").textContent = observed.workIQ === undefined ? "Not observed"
+        : workIQ ? `On · ${sent?.workIQTone ?? "—"}` : "Off";
       find(".requested").textContent = core.modelFor(observed.appliedTone)?.label || "Not observed";
       find(".response").textContent = observed.result || "Not observed";
       find(".origin").textContent = observed.origin || "Not observed";
@@ -196,7 +211,11 @@
       find(".no-tab").hidden = connected;
       find(".open-copilot").hidden = connected;
       find(".conversation-info").hidden = !connected;
-      find(".chat-model").textContent = `${model?.label ?? "—"} (${state.conversationTone ? "selected" : "default"})`;
+      // A Work IQ fallback shows both models; the reason is in the tooltip.
+      const fallback = workIQ && sent !== model;
+      find(".chat-model").textContent = fallback ? `${model?.label} → ${sent?.label}`
+        : `${model?.label ?? "—"} (${state.conversationTone ? "selected" : "default"})`;
+      find(".chat-model").title = fallback ? `${model?.label} isn't supported with Work IQ, so this chat uses ${sent?.label}` : "";
       const conversation = core.conversationView(observed.conversation, observed.expiresAt);
       find(".capacity-count").textContent = conversation.capacity;
       find(".capacity-count").title = conversation.capacityTitle;

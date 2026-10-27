@@ -141,6 +141,30 @@ test('allowances are saved for every tab and updated by each new reading', async
   assert.equal(content.snapshot().observed.metering.GPT61SolQueryDaily, 29);
 });
 
+test('a Work IQ chat sends its model\'s Work IQ tone, falls back to the default, and remembers Work IQ', async () => {
+  const B = '22222222-bbbb-4bbb-8bbb-222222222222';
+  const work = id => `wss://substrate.office.com/m365Copilot/Chathub/PRIVATE_ACCOUNT?access_token=PRIVATE_TOKEN&agent=work&scenario=officeweb&ConversationId=${id}`;
+  const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_61_Sol_Reasoning', at: 1 }, [keyOf(B)]: { tone: 'Magic', at: 1 } } });
+  const env = environment(store, { pathname: `/chat/conversation/${A}` }); const content = env.addContent(); await flush();
+  const tabs = () => store.tabMessages.filter(message => message.type === 'M365_EXTENDER_TAB');
+  const socket = new env.main.WebSocket(work(A)); socket.send(chat()); await flush();
+  // GPT-6.1 Sol has no Work IQ tone, so the default's is sent and reported.
+  assert.equal(toneSent(socket), 'Gpt_6_Sol_Chat');
+  const observed = content.snapshot().observed;
+  assert.equal(observed.workIQ, true); assert.equal(observed.appliedTone, 'Gpt_6_Sol_Reasoning'); assert.equal(observed.scenario, 'officeweb');
+  assert.equal(tabs().at(-1).tone, 'Gpt_6_Sol_Reasoning'); assert.equal(tabs().at(-1).workIQ, true);
+  env.timeout(250);
+  assert.equal(store.data.conversationReadings[keyOf(A)].workIQ, true);
+  // A model with a Work IQ tone keeps it.
+  env.location.pathname = `/chat/conversation/${B}`;
+  const other = new env.main.WebSocket(work(B)); other.send(chat('Gpt_6_Sol_Chat')); await flush();
+  assert.equal(toneSent(other), 'Magic');
+  // A new chat opened with Work IQ off is not Work IQ.
+  env.location.pathname = '/chat';
+  new env.main.WebSocket(at('33333333-cccc-4ccc-8ccc-333333333333')); await flush();
+  assert.equal(content.snapshot().observed.workIQ, false);
+});
+
 test('a chat keeps its last readings across tabs and restarts, keyed by a hash', async () => {
   const store = createStore();
   const env = environment(store, { pathname: `/chat/conversation/${A}` }); env.addContent(); await flush();

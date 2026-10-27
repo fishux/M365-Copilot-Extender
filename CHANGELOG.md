@@ -5,6 +5,8 @@ All notable changes to M365 Copilot Extender. Versions match `extension/manifest
 ## Unreleased
 
 - **Pick a model on a new chat before sending.** The popup no longer stays locked until the first message; the choice is applied to that first message and saved with the chat.
+- **Work IQ works with GPT-6 Sol.** Work IQ attaches Copilot's built-in agent, which ignores the `*_Reasoning` tones and fell back to a GPT-5 model. Work IQ chats now send GPT-6 Sol as `Gpt_6_Sol_Chat`, as Copilot's own picker does. GPT-6 Sol (and Auto) are the only models supported with Work IQ; any other model chosen for a Work IQ chat is sent as GPT-6 Sol.
+- **Work IQ indicator.** A small `[work iq]` tag on the popup's status line when the last request went through Work IQ, a `6SW` toolbar badge, a `work iq` row in the details drawer, dimmed rows for models that fall back, and the header route reads "work iq" instead of "Not observed".
 
 ## 0.3.1 — 2026-10-25
 

@@ -65,12 +65,12 @@
   }
 
   function sendNow(socket, state, data) {
-    const rewritten = core.rewrite(data, toneFor(state));
+    const rewritten = core.rewrite(data, toneFor(state), state.workIQ);
     const result = nativeSend.call(socket, rewritten.data);
-    if (rewritten.chats) emit("request", tag(state));
+    if (rewritten.chats) emit("request", { ...tag(state), workIQ: rewritten.workIQ });
     if (rewritten.tones.length) {
       state.tone = rewritten.tones.at(-1) ?? null;
-      emit("applied", { ...tag(state), tone: state.tone });
+      emit("applied", { ...tag(state), tone: state.tone, workIQ: rewritten.workIQ });
     }
     return result;
   }
