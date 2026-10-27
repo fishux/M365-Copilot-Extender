@@ -1,6 +1,7 @@
 [
   {
     "tone": "Gpt_61_Sol_Reasoning",
+    "workIQTone": null,
     "label": "GPT-6.1 Sol",
     "menuLabel": "GPT-6.1 Sol",
     "badge": "6.1",
@@ -10,6 +11,7 @@
   },
   {
     "tone": "Gpt_6_Sol_Reasoning",
+    "workIQTone": "Gpt_6_Sol_Chat",
     "default": true,
     "label": "GPT-6 Sol",
     "menuLabel": "GPT-6 Sol",
@@ -20,6 +22,7 @@
   },
   {
     "tone": "Gpt_6_Reasoning",
+    "workIQTone": null,
     "label": "GPT-6",
     "menuLabel": "GPT-6 · Think deeper",
     "badge": "6",
@@ -29,6 +32,7 @@
   },
   {
     "tone": "Gpt_5_6_Reasoning",
+    "workIQTone": null,
     "label": "GPT-5.6",
     "menuLabel": "GPT-5.6 · Think deeper",
     "badge": "5.6",
@@ -38,6 +42,7 @@
   },
   {
     "tone": "Gpt_5_5_Reasoning",
+    "workIQTone": null,
     "label": "GPT-5.5",
     "menuLabel": "GPT-5.5 · Think deeper",
     "badge": "5.5",
@@ -47,6 +52,7 @@
   },
   {
     "tone": "Magic",
+    "workIQTone": "Magic",
     "label": "Auto",
     "menuLabel": "Auto",
     "badge": "A",

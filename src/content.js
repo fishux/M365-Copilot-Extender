@@ -46,6 +46,9 @@
   let pendingChoice = null;
   /** Conversation IDs seen on connections while the page showed an unsent new chat. */
   const newChatIds = new Set();
+  /** Whether each connection's chat was opened with Work IQ on, by slot name. */
+  /** @type {Map<string, boolean>} */
+  const connectionWorkIQ = new Map();
   const revisions = { conversationTones: 0, usage: 0, conversationReadings: 0 };
   let lastPublished = "";
 
@@ -170,6 +173,13 @@
     return (key && state.conversationTones[key]?.tone) || core.DEFAULT_TONE;
   }
 
+  /** Whether a conversation (or, for null, the unsent new chat) uses Work IQ; undefined if unknown. */
+  function workIQFor(name) {
+    if (!name) return [...newChatIds].reverse().map(id => connectionWorkIQ.get(id)).find(value => value !== undefined);
+    const key = isConversation(name) ? keys.get(name) : undefined;
+    return slots.get(name)?.workIQ ?? (key ? state.readings[key]?.workIQ : undefined) ?? connectionWorkIQ.get(name);
+  }
+
   function snapshot() {
     const name = currentSlot();
     const key = isConversation(name) ? keys.get(/** @type {string} */ (name)) : undefined;
@@ -179,6 +189,8 @@
     const readings = saved && (saved.at || 0) >= (live?.at || 0) ? saved : live;
     const observed = { ...account, ...readings };
     delete observed.at;
+    const workIQ = workIQFor(name);
+    if (workIQ === undefined) delete observed.workIQ; else observed.workIQ = workIQ;
     observed.warning = live?.warning || state.tabWarning;
     if (!observed.warning) delete observed.warning;
     return { hookReady: state.hookReady, observed, conversation: key ? { key } : null,
@@ -187,8 +199,12 @@
 
   // Keep the toolbar badge and icon in step with this tab.
   function publishTab(force = false) {
-    const tone = effectiveTone(currentSlot());
-    const message = { type: "M365_EXTENDER_TAB", tone, remaining: core.lowestAllowance(tone, account.metering) };
+    const name = currentSlot();
+    // Show the model a request really uses: Work IQ may fall back to the default.
+    const chosen = effectiveTone(name);
+    const workIQ = workIQFor(name) === true;
+    const tone = core.requestFor(chosen, workIQ)?.model.tone ?? chosen;
+    const message = { type: "M365_EXTENDER_TAB", tone, remaining: core.lowestAllowance(tone, account.metering), workIQ };
     const serialized = JSON.stringify(message);
     if (serialized === lastPublished && !force) return;
     lastPublished = serialized;
@@ -209,6 +225,10 @@
       // their conversation until a chat is actually sent on it.
       account.scenario = core.safeScenario(message.scenario);
       const id = core.safeConversationId(message.conversationId);
+      const connection = slotName(message);
+      connectionWorkIQ.delete(connection);
+      connectionWorkIQ.set(connection, message.workIQ === true);
+      for (const old of connectionWorkIQ.keys()) { if (connectionWorkIQ.size <= MAX_SLOTS) break; connectionWorkIQ.delete(old); }
       if (id && !sentSlots.has(id) && !core.conversationFromPath(location.pathname)) newChatIds.add(id);
       if (id) { if (keys.has(id)) answerHook(id); else ensureKey(id); }
     } else if (message.kind === "request" || (message.kind === "applied" && core.modelFor(message.tone))) {
@@ -218,7 +238,9 @@
       adoptPendingChoice(name);
       newChatIds.delete(name);
       const observed = slot(name);
-      if (message.kind === "applied") { observed.appliedTone = core.modelFor(message.tone)?.tone; touch(name); }
+      const workIQ = message.workIQ === true;
+      if (message.kind === "applied") { observed.appliedTone = core.modelFor(message.tone)?.tone; observed.workIQ = workIQ; touch(name); }
+      else if (observed.workIQ !== workIQ) { observed.workIQ = workIQ; touch(name); }
       account.scenario = core.safeScenario(message.scenario);
       if (state.loaded) delete observed.warning;
     } else if (message.kind === "warning" && warnings[message.code]) {
@@ -280,6 +302,7 @@
       const reading = { at: Number(entry.at) || 0 };
       const applied = core.modelFor(entry.appliedTone);
       if (applied) reading.appliedTone = applied.tone;
+      if (typeof entry.workIQ === "boolean") reading.workIQ = entry.workIQ;
       if (core.allowedResults.includes(entry.result)) reading.result = entry.result;
       if (core.allowedOrigins.includes(entry.origin)) reading.origin = entry.origin;
       const used = core.count(entry.conversation?.used), limit = core.count(entry.conversation?.limit);

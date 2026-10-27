@@ -6,7 +6,8 @@
   // marked "default" is the fixed default for every chat without a selection.
   /** @type {readonly Model[]} */
   const MODELS = Object.freeze(globalThis.M365ExtenderModels.map(model => Object.freeze({ ...model })));
-  const DEFAULT_TONE = (MODELS.find(model => model.default) || MODELS[0]).tone;
+  const DEFAULT_MODEL = MODELS.find(model => model.default) || MODELS[0];
+  const DEFAULT_TONE = DEFAULT_MODEL.tone;
   // Saved per-chat selections and readings beyond this many (oldest first) are dropped.
   const MAX_SAVED_CONVERSATIONS = 2000;
   // Tones match case-insensitively: Copilot's web client sends "Magic" while
@@ -15,7 +16,8 @@
   const modelFor = tone => typeof tone === "string" ? MODELS.find(model => model.tone.toLowerCase() === tone.toLowerCase()) : undefined;
   const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
-  const SCENARIOS = Object.freeze(["OfficeWebPaidCopilot", "OfficeWebIncludedCopilot"]);
+  // Work IQ connections carry the plain "officeweb" scenario instead of a paid/included one.
+  const SCENARIOS = Object.freeze(["OfficeWebPaidCopilot", "OfficeWebIncludedCopilot", "officeweb"]);
   const safeScenario = value => SCENARIOS.includes(value) ? value : "Unknown";
   const RS = "\x1e";
   const CONVERSATION_ID = /^[0-9a-f][0-9a-f-]{15,63}$/i;
@@ -77,14 +79,34 @@
       // Never return full URLs: they may contain access tokens and account IDs.
       // ConversationId is a client-generated UUID that Copilot reuses for every
       // turn of one conversation; it is not an account identifier.
-      const conversation = [...url.searchParams].find(([key]) => key.toLowerCase() === "conversationid");
-      return { scenario: safeScenario(url.searchParams.get("scenario")), conversationId: safeConversationId(conversation?.[1]) };
+      const param = name => [...url.searchParams].find(([key]) => key.toLowerCase() === name)?.[1];
+      // Copilot's Work IQ switch opens the chat with agent=work (agent=web when off).
+      return { scenario: safeScenario(param("scenario")), conversationId: safeConversationId(param("conversationid")),
+        workIQ: param("agent")?.toLowerCase() === "work" };
     } catch { return null; }
   }
 
   function isChat(frame) {
     return isRecord(frame) && [1, 4].includes(frame.type) && frame.target === "chat" &&
       Array.isArray(frame.arguments) && isRecord(frame.arguments[0]);
+  }
+
+  // With Work IQ on, Copilot attaches its built-in agent to every chat request.
+  const WORK_IQ_AGENT = "bizchat-as-gpt-scenario";
+  const usesWorkIQ = request => Array.isArray(request?.gpts) && request.gpts.some(gpt => gpt?.id === WORK_IQ_AGENT);
+
+  /**
+   * The model a request actually uses and the tone sent for it. The Work IQ
+   * agent ignores the *_Reasoning tones and falls back to GPT-5, so Work IQ
+   * requests send the model's workIQTone; a model without one uses the default.
+   * @returns {{ model: Model, tone: string } | null}
+   */
+  function requestFor(tone, workIQ = false) {
+    const model = modelFor(tone);
+    if (!model) return null;
+    if (!workIQ) return { model, tone: model.tone };
+    const used = model.workIQTone ? model : DEFAULT_MODEL;
+    return used.workIQTone ? { model: used, tone: used.workIQTone } : null;
   }
 
   function parseRecords(data) {
@@ -97,25 +119,30 @@
 
   // Parses once and reports how many chat records were seen, so callers need
   // not re-parse a (possibly large) prompt payload to detect chat requests.
-  function rewrite(data, tone) {
+  // `tones` lists the model applied to each rewritten record; `workIQ` is true
+  // when any chat record was a Work IQ request.
+  function rewrite(data, tone, workIQ = false) {
     const tones = [];
-    let chats = 0;
-    const model = modelFor(tone);
-    if (typeof data !== "string") return { data, tones, chats };
+    let chats = 0, work = false;
+    if (typeof data !== "string") return { data, tones, chats, workIQ: work };
     const parts = data.split(RS).map(part => {
       try {
         const frame = JSON.parse(part);
         if (!isChat(frame)) return part;
         chats++;
-        if (!model) return part;
-        tones.push(model.tone);
+        const isWorkIQ = workIQ || usesWorkIQ(frame.arguments[0]);
+        work ||= isWorkIQ;
+        const request = requestFor(tone, isWorkIQ);
+        if (!request) return part;
+        tones.push(request.model.tone);
         // Leave an equivalent tone byte-identical, whatever its casing.
-        if (modelFor(frame.arguments[0].tone) === model) return part;
-        frame.arguments[0].tone = model.tone;
+        const current = frame.arguments[0].tone;
+        if (typeof current === "string" && current.toLowerCase() === request.tone.toLowerCase()) return part;
+        frame.arguments[0].tone = request.tone;
         return JSON.stringify(frame);
       } catch { return part; }
     });
-    return { data: tones.length ? parts.join(RS) : data, tones, chats };
+    return { data: tones.length ? parts.join(RS) : data, tones, chats, workIQ: work };
   }
 
   function parseMetering(raw) {
@@ -185,6 +212,6 @@
 
   globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
-    isChat, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
+    isChat, usesWorkIQ, requestFor, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });
 })();

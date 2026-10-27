@@ -35,12 +35,39 @@ test('rejects malformed chat shapes and leaves an already selected frame byte-id
   assert.equal(core.rewrite(chat(core.DEFAULT_TONE), core.DEFAULT_TONE).data, chat(core.DEFAULT_TONE));
 });
 test('endpoint scoping excludes unrelated sockets and strips credentials', () => {
-  assert.deepEqual(clone(core.connectionInfo(endpoint)), { scenario: 'OfficeWebPaidCopilot', conversationId: null });
+  assert.deepEqual(clone(core.connectionInfo(endpoint)), { scenario: 'OfficeWebPaidCopilot', conversationId: null, workIQ: false });
   const id = '3F2504E0-4F89-11D3-9A0C-0305E82C3301';
-  assert.deepEqual(clone(core.connectionInfo(endpoint + '&ConversationId=' + id)), { scenario: 'OfficeWebPaidCopilot', conversationId: id.toLowerCase() });
+  assert.deepEqual(clone(core.connectionInfo(endpoint + '&ConversationId=' + id)), { scenario: 'OfficeWebPaidCopilot', conversationId: id.toLowerCase(), workIQ: false });
   assert.equal(core.connectionInfo(endpoint + '&conversationid=' + id).conversationId, id.toLowerCase());
   for (const bad of ['', 'short', '../../etc', id + '<script>']) assert.equal(core.connectionInfo(endpoint + '&ConversationId=' + encodeURIComponent(bad)).conversationId, null);
   for (const url of ['wss://evil.example/m365Copilot/Chathub/a', 'wss://substrate.office.com.evil.example/m365Copilot/Chathub/a', 'wss://substrate.office.com/telemetry', 'invalid']) assert.equal(core.connectionInfo(url), null);
+});
+test('detects Work IQ connections from agent=work and the officeweb scenario', () => {
+  const work = 'wss://substrate.office.com/m365Copilot/Chathub/PRIVATE_ACCOUNT?access_token=PRIVATE_TOKEN&agent=work&scenario=officeweb';
+  assert.deepEqual(clone(core.connectionInfo(work)), { scenario: 'officeweb', conversationId: null, workIQ: true });
+  assert.equal(core.connectionInfo(work.replace('agent=work', 'Agent=WORK')).workIQ, true);
+  assert.equal(core.connectionInfo(work.replace('agent=work', 'agent=web')).workIQ, false);
+});
+test('Work IQ requests send each model\'s Work IQ tone and fall back to the default otherwise', () => {
+  const workChat = (tone = 'Magic') => JSON.stringify({ type: 4, target: 'chat', arguments: [{ tone, message: { text: 'PRIVATE PROMPT' },
+    gpts: [{ id: 'bizchat-as-gpt-scenario', source: 'BuiltInAgents' }] }] }) + '\x1e';
+  const sentTone = result => JSON.parse(result.data.slice(0, -1)).arguments[0].tone;
+  // The built-in agent on the request is enough, even without a Work IQ connection.
+  const sol = core.rewrite(workChat(), 'Gpt_6_Sol_Reasoning');
+  assert.equal(sentTone(sol), 'Gpt_6_Sol_Chat'); assert.deepEqual(clone(sol.tones), ['Gpt_6_Sol_Reasoning']); assert.equal(sol.workIQ, true);
+  assert.equal(core.rewrite(workChat('Gpt_6_Sol_Chat'), 'Gpt_6_Sol_Reasoning').data, workChat('Gpt_6_Sol_Chat'));
+  assert.equal(sentTone(core.rewrite(workChat('Gpt_6_Sol_Chat'), 'Magic')), 'Magic');
+  // Models without a Work IQ tone use the default model's, and report it as applied.
+  for (const tone of ['Gpt_61_Sol_Reasoning', 'Gpt_6_Reasoning', 'Gpt_5_6_Reasoning', 'Gpt_5_5_Reasoning']) {
+    const result = core.rewrite(workChat(), tone);
+    assert.equal(sentTone(result), 'Gpt_6_Sol_Chat'); assert.deepEqual(clone(result.tones), ['Gpt_6_Sol_Reasoning']);
+  }
+  // A Work IQ connection applies the mapping to a request without the agent too.
+  assert.equal(sentTone(core.rewrite(chat(), 'Gpt_5_5_Reasoning', true)), 'Gpt_6_Sol_Chat');
+  // Without Work IQ nothing changes.
+  const web = core.rewrite(chat(), 'Gpt_5_5_Reasoning');
+  assert.equal(sentTone(web), 'Gpt_5_5_Reasoning'); assert.equal(web.workIQ, false);
+  assert.equal(core.requestFor('bogus', true), null);
 });
 test('reads zero allowances and rejects missing, negative, non-finite and string values', () => {
   const metering = core.parseMetering({ GPT61SolQueryDaily: { remainingAllowance: 0 }, GPT61SolQueryWeekly: { remainingAllowance: 12 }, Invalid: { remainingAllowance: -1 }, NaN: { remainingAllowance: NaN }, String: { remainingAllowance: '40' } });

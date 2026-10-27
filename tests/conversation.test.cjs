@@ -132,9 +132,9 @@ test('the tab reports its effective model and lowest allowance for the toolbar',
   const socket = new env.main.WebSocket(at(A)); socket.send(chat()); await flush();
   reply(socket, { throttling: { metering: { GPT61SolQueryDaily: { remainingAllowance: 18 }, GPT61SolQueryWeekly: { remainingAllowance: 9 } } } });
   await flush();
-  assert.deepEqual(store.tabMessages.at(-1), { type: 'M365_EXTENDER_TAB', tone: 'Gpt_61_Sol_Reasoning', remaining: 9 });
+  assert.deepEqual(store.tabMessages.at(-1), { type: 'M365_EXTENDER_TAB', tone: 'Gpt_61_Sol_Reasoning', remaining: 9, workIQ: false });
   await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Magic', at: 3 } } }); await flush();
-  assert.deepEqual(store.tabMessages.at(-1), { type: 'M365_EXTENDER_TAB', tone: 'Magic', remaining: null });
+  assert.deepEqual(store.tabMessages.at(-1), { type: 'M365_EXTENDER_TAB', tone: 'Magic', remaining: null, workIQ: false });
 });
 
 function popup(store, snapshot) {

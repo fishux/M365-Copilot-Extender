@@ -39,12 +39,14 @@
   /** @param {"warn" | "critical"} level */
   const iconFor = level => (icons[level] ??= { 16: drawIcon(level, 16), 32: drawIcon(level, 32) });
 
-  /** @param {string} tone @param {number | null} remaining */
-  function badgeView(tone, remaining) {
+  /** @param {string} tone @param {number | null} remaining @param {boolean} [workIQ] */
+  function badgeView(tone, remaining, workIQ = false) {
     const model = core.modelFor(tone) || core.modelFor(core.DEFAULT_TONE);
     const level = core.allowanceLevel(remaining);
     const left = remaining === null ? "" : ` · ${remaining} message${remaining === 1 ? "" : "s"} left`;
-    return { text: model?.badge ?? "", color: BADGE_COLORS[level], level, title: `${TITLE} — ${model?.label ?? "Unknown"}${left}` };
+    // A Work IQ chat adds "W" to the badge, e.g. "6SW".
+    const text = (model?.badge ?? "") + (workIQ ? "W" : "");
+    return { text, color: BADGE_COLORS[level], level, title: `${TITLE} — ${model?.label ?? "Unknown"}${workIQ ? " · Work IQ" : ""}${left}` };
   }
 
   async function applyDefault() {
@@ -57,9 +59,9 @@
     ]);
   }
 
-  /** @param {number} tabId @param {string} tone @param {number | null} remaining */
-  async function applyTab(tabId, tone, remaining) {
-    const view = badgeView(tone, remaining);
+  /** @param {number} tabId @param {string} tone @param {number | null} remaining @param {boolean} workIQ */
+  async function applyTab(tabId, tone, remaining, workIQ) {
+    const view = badgeView(tone, remaining, workIQ);
     await Promise.all([
       chrome.action.setBadgeText({ tabId, text: view.text }),
       chrome.action.setBadgeBackgroundColor({ tabId, color: view.color }),
@@ -82,7 +84,7 @@
     const tabId = sender.tab?.id;
     if (sender.id !== chrome.runtime.id || message?.type !== "M365_EXTENDER_TAB" || typeof tabId !== "number") return;
     const remaining = core.count(message.remaining);
-    applyTab(tabId, message.tone, remaining).catch(() => { /* Tab closed. */ });
+    applyTab(tabId, message.tone, remaining, message.workIQ === true).catch(() => { /* Tab closed. */ });
   });
   chrome.tabs.onUpdated.addListener((tabId, info) => {
     if (info.status === "loading") resetTab(tabId).catch(() => { /* Tab closed. */ });

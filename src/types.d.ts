@@ -3,6 +3,8 @@
 
 interface Model {
   readonly tone: string;
+  /** Tone sent when Work IQ is on, or null when the model has none (the default is used). */
+  readonly workIQTone: string | null;
   readonly default?: boolean;
   readonly label: string;
   readonly menuLabel: string;
@@ -12,13 +14,13 @@ interface Model {
   readonly budgetEvidence: string;
 }
 
-type Scenario = "OfficeWebPaidCopilot" | "OfficeWebIncludedCopilot" | "Unknown";
+type Scenario = "OfficeWebPaidCopilot" | "OfficeWebIncludedCopilot" | "officeweb" | "Unknown";
 type AllowanceLevel = "normal" | "warn" | "critical";
 
 /** Saved per-conversation choices, keyed by a hash of the ConversationId. */
 type ConversationTones = Record<string, { tone: string; at: number }>;
 
-interface ConnectionInfo { scenario: Scenario; conversationId: string | null }
+interface ConnectionInfo { scenario: Scenario; conversationId: string | null; workIQ: boolean }
 
 interface SocketState extends ConnectionInfo {
   socketId: number;
@@ -39,6 +41,8 @@ interface CopilotMetadata {
 /** Readings for one conversation, as kept by the isolated script. */
 interface Observed {
   appliedTone?: string;
+  /** Whether the last request in this conversation used Work IQ. */
+  workIQ?: boolean;
   result?: string;
   origin?: string;
   conversation?: { used: number; limit: number };
@@ -79,8 +83,10 @@ interface Core {
   allowanceLevel(remaining: number | null): AllowanceLevel;
   lowestAllowance(tone: unknown, metering: Record<string, number> | undefined): number | null;
   isChat(frame: unknown): boolean;
+  usesWorkIQ(request: unknown): boolean;
+  requestFor(tone: unknown, workIQ?: boolean): { model: Model; tone: string } | null;
   parseRecords(data: unknown): any[];
-  rewrite<T>(data: T, tone: unknown): { data: T | string; tones: string[]; chats: number };
+  rewrite<T>(data: T, tone: unknown, workIQ?: boolean): { data: T | string; tones: string[]; chats: number; workIQ: boolean };
   parseMetering(raw: unknown): Record<string, number>;
   allowanceFor(tone: unknown, metering: Record<string, number> | undefined): { daily: number | null; weekly: number | null } | null;
   readMetadata(frame: any): CopilotMetadata[];

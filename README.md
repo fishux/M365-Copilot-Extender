@@ -19,23 +19,36 @@ When updating, replace the extension files in the same folder, click **Reload** 
 ## Models
 
 <!-- models:start (generated from src/models.json by npm run build) -->
-| Selection | Badge | Requested tone |
-| --- | --- | --- |
-| GPT-6.1 Sol | `6.1` | `Gpt_61_Sol_Reasoning` |
-| GPT-6 Sol (default) | `6S` | `Gpt_6_Sol_Reasoning` |
-| GPT-6 · Think deeper | `6` | `Gpt_6_Reasoning` |
-| GPT-5.6 · Think deeper | `5.6` | `Gpt_5_6_Reasoning` |
-| GPT-5.5 · Think deeper | `5.5` | `Gpt_5_5_Reasoning` |
-| Auto | `A` | `Magic` |
+| Selection | Badge | Requested tone | Work IQ tone |
+| --- | --- | --- | --- |
+| GPT-6.1 Sol | `6.1` | `Gpt_61_Sol_Reasoning` | None: uses GPT-6 Sol |
+| GPT-6 Sol (default) | `6S` | `Gpt_6_Sol_Reasoning` | `Gpt_6_Sol_Chat` |
+| GPT-6 · Think deeper | `6` | `Gpt_6_Reasoning` | None: uses GPT-6 Sol |
+| GPT-5.6 · Think deeper | `5.6` | `Gpt_5_6_Reasoning` | None: uses GPT-6 Sol |
+| GPT-5.5 · Think deeper | `5.5` | `Gpt_5_5_Reasoning` | None: uses GPT-6 Sol |
+| Auto | `A` | `Magic` | `Magic` |
 <!-- models:end -->
 
 Model matching ignores case: Copilot's web client sends `Magic` for Auto, other clients `magic`, and the service accepts both.
 
+### Work IQ
+
+Work IQ is Copilot's switch for grounding answers in Teams, Outlook, SharePoint and other work data. Turn it on or off in Copilot's page as usual; the extension follows it and has no switch of its own.
+
+**Supported with Work IQ: GPT-6 Sol only** (plus Auto, which is Copilot's own default). This is deliberate scope, not a pending gap: other models are not planned for Work IQ.
+
+- A Work IQ chat attaches Copilot's built-in `bizchat-as-gpt-scenario` agent. That agent ignores the `*_Reasoning` tones the extension normally sends and falls back to a GPT-5 model, which is why Work IQ used to drop chats to GPT-5.
+- In a Work IQ chat the extension sends the model's **Work IQ tone** from the table above: `Gpt_6_Sol_Chat` for GPT-6 Sol, the value Copilot's own picker sends.
+- Any other model chosen for a Work IQ chat is sent as **GPT-6 Sol**. In a Work IQ chat the popup dims those rows; the chat line, status line and toolbar badge name GPT-6 Sol. To use another model, turn Work IQ off for that chat.
+- When the last request went through Work IQ, the status line shows a small `[work iq]` tag, the toolbar badge reads `6SW` (tooltip: "GPT-6 Sol · Work IQ"), and the **details** drawer has a `work iq` row (`On`, `Off` or `Not observed`).
+
+A chat is treated as Work IQ when its Chathub connection carries `agent=work` or a request carries the built-in agent. Copilot starts a new chat whenever Work IQ is switched, so one chat never mixes the two.
+
 ### Adding or removing a model
 
-Edit [`src/models.json`](src/models.json) — exactly one entry has `"default": true` — then run `npm run build`. The build inlines the list into every runtime script and regenerates the tables above and in the [architecture notes](docs/architecture.md). Each entry needs a `tone` (the exact value Copilot expects), `label`, `menuLabel` (popup text), `badge` (toolbar text, at most 4 characters), `budgetPrefix` (a metering key prefix such as `GPT61SolQuery`, or `null`), `knownPaidCap` (show a waiting usage box before the first reading), and `budgetEvidence` (why that prefix is believed). Saved choices for a removed model fall back to the default.
+Edit [`src/models.json`](src/models.json) — exactly one entry has `"default": true` — then run `npm run build`. The build inlines the list into every runtime script and regenerates the tables above and in the [architecture notes](docs/architecture.md). Each entry needs a `tone` (the exact value Copilot expects), `workIQTone` (the value Copilot's own picker sends for that model with Work IQ on, or `null` to use the default's; only GPT-6 Sol, the default, and Auto have one, and the default must), `label`, `menuLabel` (popup text), `badge` (toolbar text, at most 4 characters), `budgetPrefix` (a metering key prefix such as `GPT61SolQuery`, or `null`), `knownPaidCap` (show a waiting usage box before the first reading), and `budgetEvidence` (why that prefix is believed). Saved choices for a removed model fall back to the default.
 
-The extension changes only `arguments[0].tone` on type `1`/`4` chat invocations to Copilot's Chathub socket. It preserves other SignalR records, request fields, and the connection's existing paid/included scenario. It does not add license entitlements, change routing scenarios, or automatically switch models when a budget is exhausted.
+The extension changes only `arguments[0].tone` on type `1`/`4` chat invocations to Copilot's Chathub socket. It preserves other SignalR records, request fields, Work IQ's agent and connectors, and the connection's existing paid/included scenario. It does not add license entitlements, change routing scenarios, or automatically switch models when a budget is exhausted.
 
 Microsoft controls final model routing. An applied tone and response `contentOrigin` do **not** independently verify the exact backend model. Try a new conversation if changing a model in an existing conversation is refused or behaves unexpectedly.
 
