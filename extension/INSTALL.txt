@@ -4,7 +4,7 @@ M365 Copilot Extender v0.3.1
 2. In Google Chrome, open chrome://extensions and enable Developer mode.
 3. Click Load unpacked and choose the extracted folder containing manifest.json.
 4. Pin M365 Copilot Extender from Chrome's Extensions menu.
-5. Open or reload https://m365.cloud.microsoft after installation.
+5. Open or reload https://copilot.cloud.microsoft after installation.
 
 When updating, replace the files in the same folder, click Reload on the
 extension's card at chrome://extensions, then reload every Copilot tab.

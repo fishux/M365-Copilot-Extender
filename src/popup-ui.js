@@ -4,7 +4,7 @@
   "use strict";
   const core = globalThis.M365ExtenderCore;
   const STALE_MS = 5 * 60 * 1000;
-  const COPILOT_URL = "https://m365.cloud.microsoft/chat";
+  const COPILOT_URL = "https://copilot.cloud.microsoft/chat";
   const css = `
     :host { all: initial; color-scheme: light dark; --bg:#fbfaf6; --bar:#f1efe8; --line:#d8d5cc; --soft:#e2dfd6;
       --ink:#24292f; --muted:#57606a; --good:#1a7f37; --low:#9a6700; --critical:#cf222e; --accent:#0550ae;

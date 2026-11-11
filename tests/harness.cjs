@@ -34,7 +34,7 @@ function createStore(initial = {}) {
 
 function environment(store = createStore(), { bundled = false, pathname = '/chat' } = {}) {
   const messages = [], timers = new Map(), subscribers = [], contents = [];
-  const origin = 'https://m365.cloud.microsoft';
+  const origin = 'https://copilot.cloud.microsoft';
   let timerId = 0;
   // Shared by both worlds; tests may change pathname to simulate navigation.
   const location = { origin, pathname, get href() { return origin + this.pathname; } };

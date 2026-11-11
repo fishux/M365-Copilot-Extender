@@ -27,7 +27,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://m365.cloud.microsoft/*"
+        "https://copilot.cloud.microsoft/*"
       ],
       "js": [
         "page-hook.js"
@@ -37,7 +37,7 @@
     },
     {
       "matches": [
-        "https://m365.cloud.microsoft/*"
+        "https://copilot.cloud.microsoft/*"
       ],
       "js": [
         "content.js"
