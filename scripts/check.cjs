@@ -11,7 +11,7 @@ if (pkg.version !== manifest.version || !install.startsWith(`M365 Copilot Extend
 }
 if (manifest.manifest_version !== 3 || manifest.permissions.join() !== 'storage') throw new Error('Unexpected manifest permissions');
 for (const content of manifest.content_scripts) {
-  if (content.run_at !== 'document_start' || content.matches.join() !== 'https://m365.cloud.microsoft/*') throw new Error('Unexpected injection scope');
+  if (content.run_at !== 'document_start' || content.matches.join() !== 'https://copilot.cloud.microsoft/*') throw new Error('Unexpected injection scope');
   if (content.js.length !== 1) throw new Error('Each execution world must have one self-contained script');
   for (const file of content.js) if (!fs.existsSync(path.join(root, file))) throw new Error('Missing ' + file);
 }

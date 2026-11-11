@@ -1,6 +1,6 @@
 # M365 Copilot Extender
 
-A lightweight Chrome Manifest V3 extension for persistent model selection in [Microsoft 365 Copilot](https://m365.cloud.microsoft).
+A lightweight Chrome Manifest V3 extension for persistent model selection in [Microsoft 365 Copilot](https://copilot.cloud.microsoft).
 
 Every chat starts on **GPT-6 Sol**, the fixed default. Choose a different model for a chat in the Chrome toolbar popup and that chat stays on it from then on, in every tab and across browser restarts.
 
@@ -91,7 +91,7 @@ When the active model's lowest reported daily or weekly allowance is **20 or few
 
 ## Privacy and permissions
 
-The only extension API permission is `storage`, with content scripts scoped to `https://m365.cloud.microsoft/*`. There are no host permissions, third-party requests, analytics, credentials, remote scripts, or runtime dependencies. A background service worker only sets the toolbar badge, title and icon; it makes no network requests. `chrome.storage.local` holds per-conversation model choices and last readings keyed by hashed conversation IDs, plus the last reported allowances. The page hook parses chat frames locally, but forwards only allowlisted metadata, numeric quota values and the conversation ID; it does not forward or save prompts, replies, access tokens, full socket URLs, or account identifiers.
+The only extension API permission is `storage`, with content scripts scoped to `https://copilot.cloud.microsoft/*`. There are no host permissions, third-party requests, analytics, credentials, remote scripts, or runtime dependencies. A background service worker only sets the toolbar badge, title and icon; it makes no network requests. `chrome.storage.local` holds per-conversation model choices and last readings keyed by hashed conversation IDs, plus the last reported allowances. The page hook parses chat frames locally, but forwards only allowlisted metadata, numeric quota values and the conversation ID; it does not forward or save prompts, replies, access tokens, full socket URLs, or account identifiers.
 
 The page bridge is observable by scripts on the Copilot page. It is an instrumentation channel, not an authenticated model-identity or security boundary. See [architecture and limitations](docs/architecture.md).
 
