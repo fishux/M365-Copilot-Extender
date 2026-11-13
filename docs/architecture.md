@@ -55,6 +55,8 @@ Both worlds communicate via same-window, same-origin `postMessage` with an expli
 
 The content script sends the background worker `{ tone, remaining, workIQ }` for the tab: the model actually sent (conversation choice or default, after any Work IQ fallback), its lowest reported daily/weekly allowance, and whether the chat uses Work IQ. The worker sets a per-tab badge from `badge` in `models.json`, with `W` appended for Work IQ (`6SW`), and colours the badge and icon at 20 or fewer (orange) and 10 or fewer (red) remaining. The coloured icons are drawn at runtime with `OffscreenCanvas` from the same shapes as `icons/source.svg`. When a tab starts loading, the worker resets it to the default badge; the content script re-sends its state after navigation settles.
 
+The manifest's `_execute_action` command (suggested key Alt+Shift+M) opens the popup; it needs no permission. In the popup, number keys click the matching model row and the up/down arrows move focus between rows.
+
 No extension DOM or UI is injected into Copilot. The renderer is bundled only into the toolbar popup. Outside Copilot the popup cannot change a chat's model, because there is no conversation to save it against; it still shows the saved allowances. Tab metadata is available only when the tab's content script is reachable. The UI does not claim that `DeepLeo` identifies a precise model version.
 
 ## Current limits and live acceptance checks

@@ -35,6 +35,10 @@
     return remaining <= ALLOWANCE_LEVELS.warn ? "warn" : "normal";
   }
 
+  /** Keep only the newest entries of a saved per-conversation map. */
+  const newest = entries => Object.fromEntries(Object.entries(entries)
+    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, MAX_SAVED_CONVERSATIONS));
+
   /** Conversation shown in a Copilot page path, e.g. /chat/conversation/<id>. */
   function conversationFromPath(pathname) {
     const match = /\/chat\/conversation\/([^/?#]+)/i.exec(typeof pathname === "string" ? pathname : "");
@@ -61,6 +65,7 @@
     const used = count(conversation?.used), limit = count(conversation?.limit);
     const known = used !== null && limit !== null;
     const expiry = parseExpiry(expiresAt);
+    const timeLeft = expiry ? Date.parse(expiry) - now : null;
     const shortDate = expiry ? new Date(expiry).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
     return {
       capacity: known ? `${used} / ${limit} messages` : "Awaiting reply",
@@ -69,7 +74,9 @@
       percent: known && limit > 0 ? Math.min(100, used / limit * 100) : null,
       nearLimit: known && (limit === 0 || used / limit >= 0.9),
       expiry,
-      expiryText: expiry ? `${shortDate} · ${timeRemaining(Date.parse(expiry) - now)}` : "Not reported",
+      // Under a day left (or already passed): worth saving anything needed from the chat.
+      expiresSoon: timeLeft !== null && timeLeft < 86_400_000,
+      expiryText: timeLeft !== null ? `${shortDate} · ${timeRemaining(timeLeft)}` : "Not reported",
       expiryTitle: expiry ? `${new Date(expiry).toLocaleString()} — server-reported conversation expiry; not a guaranteed data deletion date.` : "Copilot has not reported a conversation expiry time."
     };
   }
@@ -213,7 +220,7 @@
     });
   }
 
-  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
+  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, newest, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
     isChat, usesWorkIQ, requestFor, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });
@@ -290,10 +297,6 @@
     return observed;
   }
 
-  /** Keep only the newest entries of a saved per-conversation map. */
-  const newest = entries => Object.fromEntries(Object.entries(entries)
-    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS));
-
   function touch(name) {
     const observed = slot(name);
     observed.at = Date.now();
@@ -320,7 +323,7 @@
       changed = true;
     }
     if (!changed) return;
-    state.readings = newest(next);
+    state.readings = core.newest(next);
     chrome.storage.local.set({ conversationReadings: state.readings }).catch(() => { /* Readings stay in this tab. */ });
   }
 
@@ -358,13 +361,15 @@
     post({ kind: "conversation", conversationId: id, tone: saved || chosen || null });
   }
 
+  const answerAll = () => { for (const id of keys.keys()) answerHook(id); };
+
   /** Save a new chat's pre-send choice under its conversation once the chat is sent. */
   function adoptPendingChoice(id) {
     const choice = pendingChoice, key = keys.get(id);
     if (!choice || !newChatIds.has(id)) return;
     pendingChoice = null;
     if (!key || !choice.tone || choice.tone === core.DEFAULT_TONE) return;
-    const tones = newest({ ...state.conversationTones, [key]: { tone: choice.tone, at: Date.now() } });
+    const tones = core.newest({ ...state.conversationTones, [key]: { tone: choice.tone, at: Date.now() } });
     chrome.storage.local.set({ conversationTones: tones }).catch(() => { /* This tab keeps the choice for the session. */ });
     state.conversationTones = tones;
   }
@@ -437,7 +442,7 @@
     if (message.kind === "ready") {
       state.hookReady = true;
       if (state.loaded) configure();
-      for (const id of keys.keys()) answerHook(id);
+      answerAll();
     } else if (message.kind === "configured") {
       state.hookReady = true;
     } else if (message.kind === "connection") {
@@ -544,7 +549,7 @@
 
   function applyConversationTones(raw) {
     state.conversationTones = validTones(raw);
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -591,13 +596,13 @@
     if (fresh("conversationReadings")) state.readings = validReadings(settings.conversationReadings);
     state.loaded = true;
     configure();
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
     publishTab();
   }).catch(() => {
     state.failed = true;
     state.tabWarning = "Preferences unavailable; this tab is using Copilot’s setting.";
     configure();
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
   });
   post({ kind: "hello" });
   setTimeout(() => {

@@ -35,6 +35,10 @@
     return remaining <= ALLOWANCE_LEVELS.warn ? "warn" : "normal";
   }
 
+  /** Keep only the newest entries of a saved per-conversation map. */
+  const newest = entries => Object.fromEntries(Object.entries(entries)
+    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, MAX_SAVED_CONVERSATIONS));
+
   /** Conversation shown in a Copilot page path, e.g. /chat/conversation/<id>. */
   function conversationFromPath(pathname) {
     const match = /\/chat\/conversation\/([^/?#]+)/i.exec(typeof pathname === "string" ? pathname : "");
@@ -61,6 +65,7 @@
     const used = count(conversation?.used), limit = count(conversation?.limit);
     const known = used !== null && limit !== null;
     const expiry = parseExpiry(expiresAt);
+    const timeLeft = expiry ? Date.parse(expiry) - now : null;
     const shortDate = expiry ? new Date(expiry).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
     return {
       capacity: known ? `${used} / ${limit} messages` : "Awaiting reply",
@@ -69,7 +74,9 @@
       percent: known && limit > 0 ? Math.min(100, used / limit * 100) : null,
       nearLimit: known && (limit === 0 || used / limit >= 0.9),
       expiry,
-      expiryText: expiry ? `${shortDate} · ${timeRemaining(Date.parse(expiry) - now)}` : "Not reported",
+      // Under a day left (or already passed): worth saving anything needed from the chat.
+      expiresSoon: timeLeft !== null && timeLeft < 86_400_000,
+      expiryText: timeLeft !== null ? `${shortDate} · ${timeRemaining(timeLeft)}` : "Not reported",
       expiryTitle: expiry ? `${new Date(expiry).toLocaleString()} — server-reported conversation expiry; not a guaranteed data deletion date.` : "Copilot has not reported a conversation expiry time."
     };
   }
@@ -213,7 +220,7 @@
     });
   }
 
-  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
+  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, newest, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
     isChat, usesWorkIQ, requestFor, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });
@@ -260,7 +267,7 @@
     .tag { color:var(--muted); font-size:11px; } .tag.selected { color:var(--low); }
     .chip { height:24px; padding:0 8px; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer; font-size:11px; }
     .chip:hover { background:var(--hover); }
-    .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit { color:var(--low); }
+    .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit, .expiry-value.soon { color:var(--low); }
     .capacity-track { width:80px; height:8px; margin-right:8px; flex:none; border-radius:2px; background:var(--soft); overflow:hidden; position:relative; }
     .capacity-track::after { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 7px,var(--bg) 7px 8px); }
     .capacity-fill { height:100%; background:var(--ink); } .capacity-fill.near-limit { background:var(--low); }
@@ -333,6 +340,17 @@
       find(".models").append(row);
       rows.push({ tone: model.tone, row, pick, mark, tag });
     }
+    // Keyboard: 1–6 picks that row's model; arrows move between rows.
+    card.addEventListener("keydown", event => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const picks = rows.map(row => row.pick);
+      const digit = /^[1-9]$/.test(event.key) ? picks[Number(event.key) - 1] : undefined;
+      const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+      if (digit && !digit.disabled) digit.click();
+      else if (step) picks[(Math.max(0, picks.indexOf(/** @type {any} */ (root.activeElement))) + step + picks.length) % picks.length].focus();
+      else return;
+      event.preventDefault();
+    });
     const toggle = find(".toggle");
     toggle.addEventListener("click", () => {
       const open = toggle.getAttribute("aria-expanded") !== "true";
@@ -355,7 +373,7 @@
       const selectable = !!(state.conversation || state.newChat);
       const locked = !state.loaded || state.saving || !selectable;
       find(".models").classList.toggle("locked", locked);
-      find(".models-hint").textContent = selectable ? "click to switch" : "open a chat to switch";
+      find(".models-hint").textContent = selectable ? `click or press 1–${rows.length}` : "open a chat to switch";
       for (const { tone: rowTone, row, pick, mark, tag } of rows) {
         const rowModel = core.modelFor(rowTone);
         const isDefault = rowTone === state.tone, isActive = rowTone === tone;
@@ -452,6 +470,7 @@
       find(".capacity-fill").style.width = `${conversation.percent ?? 0}%`;
       find(".capacity-fill").classList.toggle("near-limit", conversation.nearLimit);
       find(".expiry-value").textContent = conversation.expiryText;
+      find(".expiry-value").classList.toggle("soon", conversation.expiresSoon);
       find(".expiry-value").title = conversation.expiryTitle;
       find(".expiry-value").setAttribute("aria-label", conversation.expiryTitle);
       if (conversation.expiry) find(".expiry-value").setAttribute("datetime", conversation.expiry);
@@ -482,12 +501,10 @@
     onConversationSelect: tone => saveConversation(tone)
   });
   const render = () => panel.update(state);
-  async function save(patch) {
+  /** Run one change with the rows locked, showing `failure` if it throws. */
+  async function change(action, failure) {
     state.saving = true; state.error = ""; render();
-    try {
-      await chrome.storage.local.set(patch);
-      applySettings(patch);
-    } catch { state.error = "Could not save changes. Please try again."; }
+    try { await action(); } catch { state.error = failure; }
     finally { state.saving = false; render(); }
   }
   /**
@@ -502,19 +519,17 @@
     const next = { ...conversationTones };
     if (model && model.tone !== core.DEFAULT_TONE) next[key] = { tone: model.tone, at: Date.now() };
     else delete next[key];
-    const recent = Object.entries(next).sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS);
-    return save({ conversationTones: Object.fromEntries(recent) });
+    const patch = { conversationTones: core.newest(next) };
+    return change(async () => { await chrome.storage.local.set(patch); applySettings(patch); }, "Could not save changes. Please try again.");
   }
-  /** @param {string | null} tone */
-  async function chooseForNewChat(tone) {
-    state.saving = true; state.error = ""; render();
-    try {
+  /** A new chat has no conversation yet; its tab holds the choice until the first message. @param {string | null} tone */
+  function chooseForNewChat(tone) {
+    return change(async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const reply = await chrome.tabs.sendMessage(/** @type {number} */ (tab.id), { type: "M365_EXTENDER_NEW_CHAT_TONE", tone });
       if (!reply?.ok) throw new Error("rejected");
       await readTab();
-    } catch { state.error = "Could not change the model. Reload Copilot and try again."; }
-    finally { state.saving = false; render(); }
+    }, "Could not change the model. Reload Copilot and try again.");
   }
   function refreshConversation() {
     const key = state.conversation?.key;

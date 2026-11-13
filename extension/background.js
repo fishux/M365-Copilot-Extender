@@ -35,6 +35,10 @@
     return remaining <= ALLOWANCE_LEVELS.warn ? "warn" : "normal";
   }
 
+  /** Keep only the newest entries of a saved per-conversation map. */
+  const newest = entries => Object.fromEntries(Object.entries(entries)
+    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, MAX_SAVED_CONVERSATIONS));
+
   /** Conversation shown in a Copilot page path, e.g. /chat/conversation/<id>. */
   function conversationFromPath(pathname) {
     const match = /\/chat\/conversation\/([^/?#]+)/i.exec(typeof pathname === "string" ? pathname : "");
@@ -61,6 +65,7 @@
     const used = count(conversation?.used), limit = count(conversation?.limit);
     const known = used !== null && limit !== null;
     const expiry = parseExpiry(expiresAt);
+    const timeLeft = expiry ? Date.parse(expiry) - now : null;
     const shortDate = expiry ? new Date(expiry).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
     return {
       capacity: known ? `${used} / ${limit} messages` : "Awaiting reply",
@@ -69,7 +74,9 @@
       percent: known && limit > 0 ? Math.min(100, used / limit * 100) : null,
       nearLimit: known && (limit === 0 || used / limit >= 0.9),
       expiry,
-      expiryText: expiry ? `${shortDate} · ${timeRemaining(Date.parse(expiry) - now)}` : "Not reported",
+      // Under a day left (or already passed): worth saving anything needed from the chat.
+      expiresSoon: timeLeft !== null && timeLeft < 86_400_000,
+      expiryText: timeLeft !== null ? `${shortDate} · ${timeRemaining(timeLeft)}` : "Not reported",
       expiryTitle: expiry ? `${new Date(expiry).toLocaleString()} — server-reported conversation expiry; not a guaranteed data deletion date.` : "Copilot has not reported a conversation expiry time."
     };
   }
@@ -213,7 +220,7 @@
     });
   }
 
-  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
+  shared.core = Object.freeze({ MODELS, DEFAULT_TONE, newest, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
     isChat, usesWorkIQ, requestFor, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });
@@ -231,7 +238,7 @@
   const DEFAULT_ICON = { 16: "icons/icon16.png", 32: "icons/icon32.png" };
   /** @type {Partial<Record<"warn" | "critical", Record<number, ImageData>>>} */
   const icons = {};
-  const defaultTone = core.DEFAULT_TONE;
+  const DEFAULT_MODEL = /** @type {Model} */ (core.modelFor(core.DEFAULT_TONE));
 
   /** @param {"warn" | "critical"} level @param {number} size */
   function drawIcon(level, size) {
@@ -261,56 +268,40 @@
 
   /** @param {string} tone @param {number | null} remaining @param {boolean} [workIQ] */
   function badgeView(tone, remaining, workIQ = false) {
-    const model = core.modelFor(tone) || core.modelFor(core.DEFAULT_TONE);
-    const level = core.allowanceLevel(remaining);
+    const model = core.modelFor(tone) || DEFAULT_MODEL;
     const left = remaining === null ? "" : ` · ${remaining} message${remaining === 1 ? "" : "s"} left`;
     // A Work IQ chat adds "W" to the badge, e.g. "6SW".
-    const text = (model?.badge ?? "") + (workIQ ? "W" : "");
-    return { text, color: BADGE_COLORS[level], level, title: `${TITLE} — ${model?.label ?? "Unknown"}${workIQ ? " · Work IQ" : ""}${left}` };
+    return { text: model.badge + (workIQ ? "W" : ""), level: core.allowanceLevel(remaining),
+      title: `${TITLE} — ${model.label}${workIQ ? " · Work IQ" : ""}${left}` };
   }
+  /** Shown when no Copilot tab has reported: globally, and on a tab that navigates. */
+  const DEFAULT_VIEW = { text: DEFAULT_MODEL.badge, level: /** @type {AllowanceLevel} */ ("normal"), title: `${TITLE} — Default: ${DEFAULT_MODEL.label}` };
 
-  async function applyDefault() {
-    const view = badgeView(defaultTone, null);
-    await Promise.all([
-      chrome.action.setBadgeText({ text: view.text }),
-      chrome.action.setBadgeBackgroundColor({ color: view.color }),
-      chrome.action.setBadgeTextColor({ color: "#ffffff" }),
-      chrome.action.setTitle({ title: `${TITLE} — Default: ${core.modelFor(defaultTone)?.label}` })
-    ]);
-  }
-
-  /** @param {number} tabId @param {string} tone @param {number | null} remaining @param {boolean} workIQ */
-  async function applyTab(tabId, tone, remaining, workIQ) {
-    const view = badgeView(tone, remaining, workIQ);
-    await Promise.all([
-      chrome.action.setBadgeText({ tabId, text: view.text }),
-      chrome.action.setBadgeBackgroundColor({ tabId, color: view.color }),
+  /**
+   * Set the badge, title and icon for one tab, or for every tab without its own
+   * when tabId is omitted. A null text makes a tab show the global badge again.
+   * @param {{ text: string | null, level: AllowanceLevel, title: string }} view @param {number} [tabId]
+   */
+  function apply(view, tabId) {
+    return Promise.all([
+      chrome.action.setBadgeText({ tabId, text: /** @type {any} */ (view.text) }),
+      chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLORS[view.level] }),
       chrome.action.setTitle({ tabId, title: view.title }),
-      view.level === "normal" ? chrome.action.setIcon({ tabId, path: DEFAULT_ICON }) : chrome.action.setIcon({ tabId, imageData: iconFor(view.level) })
-    ]);
-  }
-
-  /** Leaving Copilot (or reloading) returns the tab to the default badge. */
-  async function resetTab(tabId) {
-    await Promise.all([
-      chrome.action.setBadgeText({ tabId, text: /** @type {any} */ (null) }),
-      chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLORS.normal }),
-      chrome.action.setTitle({ tabId, title: `${TITLE} — Default: ${core.modelFor(defaultTone)?.label}` }),
-      chrome.action.setIcon({ tabId, path: DEFAULT_ICON })
+      chrome.action.setIcon(view.level === "normal" ? { tabId, path: DEFAULT_ICON } : { tabId, imageData: iconFor(view.level) })
     ]);
   }
 
   chrome.runtime.onMessage.addListener((message, sender) => {
     const tabId = sender.tab?.id;
     if (sender.id !== chrome.runtime.id || message?.type !== "M365_EXTENDER_TAB" || typeof tabId !== "number") return;
-    const remaining = core.count(message.remaining);
-    applyTab(tabId, message.tone, remaining, message.workIQ === true).catch(() => { /* Tab closed. */ });
+    apply(badgeView(message.tone, core.count(message.remaining), message.workIQ === true), tabId).catch(() => { /* Tab closed. */ });
   });
   chrome.tabs.onUpdated.addListener((tabId, info) => {
-    if (info.status === "loading") resetTab(tabId).catch(() => { /* Tab closed. */ });
+    // Leaving Copilot (or reloading) returns the tab to the default badge.
+    if (info.status === "loading") apply({ ...DEFAULT_VIEW, text: null }, tabId).catch(() => { /* Tab closed. */ });
   });
   // The default model is fixed in models.json; per-chat selections arrive from tabs.
-  applyDefault().catch(() => {});
+  Promise.all([apply(DEFAULT_VIEW), chrome.action.setBadgeTextColor({ color: "#ffffff" })]).catch(() => {});
 })();
 
 })();

@@ -56,6 +56,9 @@ document.getElementById('checks').addEventListener('click', async () => {
     check(wire().includes('Gpt_6_Sol_Reasoning'), 'The chat uses the default again');
     check(popupRoot.querySelector('.expiry-value').getAttribute('datetime') !== null, 'Popup receives server expiry');
     check(popupRoot.querySelector('.expiry-value').title.includes('not a guaranteed data deletion date'), 'Exact expiry explains its meaning');
+    popupRoot.querySelector('.card').dispatchEvent(new popup.KeyboardEvent('keydown', { key: '3', bubbles: true })); await pause(1600);
+    check(row('Gpt_6_Reasoning').classList.contains('active'), 'Pressing 3 switches the chat to the third model');
+    choose('Gpt_6_Sol_Reasoning'); await pause(1600);
     result.textContent = passed.length + ' UI checks passed · simulated transport'; result.dataset.status = 'passed';
   } catch (error) { result.textContent = 'FAILED: ' + error.message; result.dataset.status = 'failed'; }
 });

@@ -120,6 +120,8 @@ test('expiry labels handle short intervals, day ranges, passed timestamps and ab
   assert.match(core.conversationView(null, '2026-11-18T00:00:00Z', now).expiryText, /30d$/);
   assert.match(core.conversationView(null, '2026-10-18T00:00:00Z', now).expiryText, /Passed$/);
   assert.equal(core.conversationView(null, null, now).expiryText, 'Not reported');
+  // Under a day left, or already passed, is flagged; absence is not.
+  assert.deepEqual(['2026-10-19T23:59:00Z', '2026-10-18T00:00:00Z', '2026-10-20T00:00:00Z', null].map(value => core.conversationView(null, value, now).expiresSoon), [true, true, false, false]);
   assert.match(core.conversationView(null, '2026-11-18T00:00:00Z', now).expiryTitle, /not a guaranteed data deletion date/);
 });
 test('final and streaming metadata carry only normalized server expiry timestamps', () => {
@@ -127,4 +129,11 @@ test('final and streaming metadata carry only normalized server expiry timestamp
   assert.equal(core.readMetadata({ type: 2, item })[0].expiresAt, '2026-11-18T12:30:00.000Z');
   assert.equal(core.readMetadata({ type: 1, target: 'update', arguments: [item] })[0].expiresAt, '2026-11-18T12:30:00.000Z');
   assert.deepEqual(clone(core.readMetadata({ type: 2, item: { conversationExpiryTime: 'invalid' } })), []);
+});
+
+test('newest keeps the most recently touched saved conversations', () => {
+  const entries = Object.fromEntries(Array.from({ length: 2003 }, (_, index) => [`k${index}`, { at: index }]));
+  const kept = core.newest({ ...entries, legacy: {} });
+  assert.equal(Object.keys(kept).length, 2000);
+  assert.ok(kept.k2002 && kept.k3 && !kept.k2 && !kept.legacy);
 });

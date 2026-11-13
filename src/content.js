@@ -70,10 +70,6 @@
     return observed;
   }
 
-  /** Keep only the newest entries of a saved per-conversation map. */
-  const newest = entries => Object.fromEntries(Object.entries(entries)
-    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS));
-
   function touch(name) {
     const observed = slot(name);
     observed.at = Date.now();
@@ -100,7 +96,7 @@
       changed = true;
     }
     if (!changed) return;
-    state.readings = newest(next);
+    state.readings = core.newest(next);
     chrome.storage.local.set({ conversationReadings: state.readings }).catch(() => { /* Readings stay in this tab. */ });
   }
 
@@ -138,13 +134,15 @@
     post({ kind: "conversation", conversationId: id, tone: saved || chosen || null });
   }
 
+  const answerAll = () => { for (const id of keys.keys()) answerHook(id); };
+
   /** Save a new chat's pre-send choice under its conversation once the chat is sent. */
   function adoptPendingChoice(id) {
     const choice = pendingChoice, key = keys.get(id);
     if (!choice || !newChatIds.has(id)) return;
     pendingChoice = null;
     if (!key || !choice.tone || choice.tone === core.DEFAULT_TONE) return;
-    const tones = newest({ ...state.conversationTones, [key]: { tone: choice.tone, at: Date.now() } });
+    const tones = core.newest({ ...state.conversationTones, [key]: { tone: choice.tone, at: Date.now() } });
     chrome.storage.local.set({ conversationTones: tones }).catch(() => { /* This tab keeps the choice for the session. */ });
     state.conversationTones = tones;
   }
@@ -217,7 +215,7 @@
     if (message.kind === "ready") {
       state.hookReady = true;
       if (state.loaded) configure();
-      for (const id of keys.keys()) answerHook(id);
+      answerAll();
     } else if (message.kind === "configured") {
       state.hookReady = true;
     } else if (message.kind === "connection") {
@@ -324,7 +322,7 @@
 
   function applyConversationTones(raw) {
     state.conversationTones = validTones(raw);
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -371,13 +369,13 @@
     if (fresh("conversationReadings")) state.readings = validReadings(settings.conversationReadings);
     state.loaded = true;
     configure();
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
     publishTab();
   }).catch(() => {
     state.failed = true;
     state.tabWarning = "Preferences unavailable; this tab is using Copilot’s setting.";
     configure();
-    for (const id of keys.keys()) answerHook(id);
+    answerAll();
   });
   post({ kind: "hello" });
   setTimeout(() => {

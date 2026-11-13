@@ -40,7 +40,7 @@
     .tag { color:var(--muted); font-size:11px; } .tag.selected { color:var(--low); }
     .chip { height:24px; padding:0 8px; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer; font-size:11px; }
     .chip:hover { background:var(--hover); }
-    .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit { color:var(--low); }
+    .capacity-count { font-variant-numeric:tabular-nums; } .capacity-count.near-limit, .expiry-value.soon { color:var(--low); }
     .capacity-track { width:80px; height:8px; margin-right:8px; flex:none; border-radius:2px; background:var(--soft); overflow:hidden; position:relative; }
     .capacity-track::after { content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg,transparent 0 7px,var(--bg) 7px 8px); }
     .capacity-fill { height:100%; background:var(--ink); } .capacity-fill.near-limit { background:var(--low); }
@@ -113,6 +113,17 @@
       find(".models").append(row);
       rows.push({ tone: model.tone, row, pick, mark, tag });
     }
+    // Keyboard: 1–6 picks that row's model; arrows move between rows.
+    card.addEventListener("keydown", event => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const picks = rows.map(row => row.pick);
+      const digit = /^[1-9]$/.test(event.key) ? picks[Number(event.key) - 1] : undefined;
+      const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+      if (digit && !digit.disabled) digit.click();
+      else if (step) picks[(Math.max(0, picks.indexOf(/** @type {any} */ (root.activeElement))) + step + picks.length) % picks.length].focus();
+      else return;
+      event.preventDefault();
+    });
     const toggle = find(".toggle");
     toggle.addEventListener("click", () => {
       const open = toggle.getAttribute("aria-expanded") !== "true";
@@ -135,7 +146,7 @@
       const selectable = !!(state.conversation || state.newChat);
       const locked = !state.loaded || state.saving || !selectable;
       find(".models").classList.toggle("locked", locked);
-      find(".models-hint").textContent = selectable ? "click to switch" : "open a chat to switch";
+      find(".models-hint").textContent = selectable ? `click or press 1–${rows.length}` : "open a chat to switch";
       for (const { tone: rowTone, row, pick, mark, tag } of rows) {
         const rowModel = core.modelFor(rowTone);
         const isDefault = rowTone === state.tone, isActive = rowTone === tone;
@@ -232,6 +243,7 @@
       find(".capacity-fill").style.width = `${conversation.percent ?? 0}%`;
       find(".capacity-fill").classList.toggle("near-limit", conversation.nearLimit);
       find(".expiry-value").textContent = conversation.expiryText;
+      find(".expiry-value").classList.toggle("soon", conversation.expiresSoon);
       find(".expiry-value").title = conversation.expiryTitle;
       find(".expiry-value").setAttribute("aria-label", conversation.expiryTitle);
       if (conversation.expiry) find(".expiry-value").setAttribute("datetime", conversation.expiry);

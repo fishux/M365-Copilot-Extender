@@ -66,6 +66,7 @@ interface ConversationView {
   percent: number | null;
   nearLimit: boolean;
   expiry: string | null;
+  expiresSoon: boolean;
   expiryText: string;
   expiryTitle: string;
 }
@@ -73,7 +74,7 @@ interface ConversationView {
 interface Core {
   MODELS: readonly Model[];
   DEFAULT_TONE: string;
-  MAX_SAVED_CONVERSATIONS: number;
+  newest<T extends { at?: number }>(entries: Record<string, T>): Record<string, T>;
   ALLOWANCE_LEVELS: Readonly<{ warn: number; critical: number }>;
   modelFor(tone: unknown): Model | undefined;
   connectionInfo(rawURL: string): ConnectionInfo | null;
