@@ -58,15 +58,15 @@ test('Work IQ requests send each model\'s Work IQ tone and fall back to the defa
   assert.equal(core.rewrite(workChat('Gpt_6_Sol_Chat'), 'Gpt_6_Sol_Reasoning').data, workChat('Gpt_6_Sol_Chat'));
   assert.equal(sentTone(core.rewrite(workChat('Gpt_6_Sol_Chat'), 'Magic')), 'Magic');
   // Models without a Work IQ tone use the default model's, and report it as applied.
-  for (const tone of ['Gpt_61_Sol_Reasoning', 'Gpt_6_Reasoning', 'Gpt_5_6_Reasoning', 'Gpt_5_5_Reasoning']) {
+  for (const tone of ['Gpt_61_Sol_Reasoning', 'Gpt_62_Sol_Reasoning']) {
     const result = core.rewrite(workChat(), tone);
     assert.equal(sentTone(result), 'Gpt_6_Sol_Chat'); assert.deepEqual(clone(result.tones), ['Gpt_6_Sol_Reasoning']);
   }
   // A Work IQ connection applies the mapping to a request without the agent too.
-  assert.equal(sentTone(core.rewrite(chat(), 'Gpt_5_5_Reasoning', true)), 'Gpt_6_Sol_Chat');
+  assert.equal(sentTone(core.rewrite(chat(), 'Gpt_61_Sol_Reasoning', true)), 'Gpt_6_Sol_Chat');
   // Without Work IQ nothing changes.
-  const web = core.rewrite(chat(), 'Gpt_5_5_Reasoning');
-  assert.equal(sentTone(web), 'Gpt_5_5_Reasoning'); assert.equal(web.workIQ, false);
+  const web = core.rewrite(chat(), 'Gpt_61_Sol_Reasoning');
+  assert.equal(sentTone(web), 'Gpt_61_Sol_Reasoning'); assert.equal(web.workIQ, false);
   assert.equal(core.requestFor('bogus', true), null);
 });
 test('reads zero allowances and rejects missing, negative, non-finite and string values', () => {
@@ -79,7 +79,7 @@ test('reads zero allowances and rejects missing, negative, non-finite and string
 });
 test('only associates unambiguous model-specific Daily/Weekly keys when observed', () => {
   assert.deepEqual(clone(core.allowanceFor('Gpt_6_Sol_Reasoning', { GPT6SolQueryDaily: 9 })), { daily: 9, weekly: null });
-  assert.equal(core.allowanceFor('Gpt_6_Reasoning', { GPT61SolQueryDaily: 9 }), null);
+  assert.equal(core.allowanceFor('Gpt_62_Sol_Reasoning', { GPT61SolQueryDaily: 9 }), null);
   assert.equal(core.allowanceFor('Gpt_61_Sol_Reasoning', { ClaudeOpusQueryDaily: 40 }), null);
 });
 test('reads quota and refusals from final type 2 and streaming type 1, without leaking text', () => {
@@ -136,4 +136,12 @@ test('newest keeps the most recently touched saved conversations', () => {
   const kept = core.newest({ ...entries, legacy: {} });
   assert.equal(Object.keys(kept).length, 2000);
   assert.ok(kept.k2002 && kept.k3 && !kept.k2 && !kept.legacy);
+});
+test('offers GPT-6.2 Sol, 6.1 Sol, 6 Sol and Auto only, and reads the GPT-6.2 budgets', () => {
+  assert.deepEqual(core.MODELS.map(model => model.tone), ['Gpt_62_Sol_Reasoning', 'Gpt_61_Sol_Reasoning', 'Gpt_6_Sol_Reasoning', 'Magic']);
+  for (const tone of ['Gpt_5_6_Reasoning', 'Gpt_5_5_Reasoning', 'Gpt_6_Reasoning', 'Gpt_62_Astra_Reasoning']) assert.equal(core.modelFor(tone), undefined);
+  assert.equal(JSON.parse(core.rewrite(chat(), 'Gpt_62_Sol_Reasoning').data.slice(0, -1)).arguments[0].tone, 'Gpt_62_Sol_Reasoning');
+  const metering = core.parseMetering({ GPT62SolQueryDaily: { remainingAllowance: 30 }, GPT62SolQueryWeekly: { remainingAllowance: 9 } });
+  assert.deepEqual(clone(core.allowanceFor('Gpt_62_Sol_Reasoning', metering)), { daily: 30, weekly: 9 });
+  assert.equal(core.lowestAllowance('Gpt_62_Sol_Reasoning', metering), 9);
 });

@@ -23,24 +23,24 @@ test('popup shows active-tab metadata and saves a model for the chat, not a defa
   const view = popup(store, inChat); await settle();
   assert.equal(view.state().tone, 'Gpt_6_Sol_Reasoning'); assert.equal(view.state().observed.metering.GPT61SolQueryDaily, 6);
   assert.equal(view.callbacks.onSelect, undefined); assert.equal(view.callbacks.onVisibility, undefined);
-  await view.callbacks.onConversationSelect('Gpt_5_6_Reasoning'); await settle();
-  assert.equal(store.data.conversationTones[KEY].tone, 'Gpt_5_6_Reasoning');
+  await view.callbacks.onConversationSelect('Gpt_62_Sol_Reasoning'); await settle();
+  assert.equal(store.data.conversationTones[KEY].tone, 'Gpt_62_Sol_Reasoning');
   assert.equal(store.data.selectedTone, 'Gpt_5_5_Reasoning'); assert.equal(store.data.inPageEnabled, true);
-  assert.equal(view.state().conversationTone, 'Gpt_5_6_Reasoning'); assert.equal(view.state().inPageEnabled, undefined);
+  assert.equal(view.state().conversationTone, 'Gpt_62_Sol_Reasoning'); assert.equal(view.state().inPageEnabled, undefined);
 });
 test('popup startup resolves changed and unchanged settings independently', async () => {
   const store = createStore(); let resolve;
   store.chrome.storage.local.get = () => new Promise(r => { resolve = r; });
   const view = popup(store, inChat);
-  await store.chrome.storage.local.set({ conversationTones: { [KEY]: { tone: 'Gpt_5_6_Reasoning', at: 2 } } });
+  await store.chrome.storage.local.set({ conversationTones: { [KEY]: { tone: 'Gpt_62_Sol_Reasoning', at: 2 } } });
   resolve({ conversationTones: { [KEY]: { tone: 'Magic', at: 1 } }, usage: { metering: { GPT61SolQueryDaily: 40 }, quotaAt: 200 } }); await settle();
-  assert.equal(view.state().conversationTone, 'Gpt_5_6_Reasoning');
+  assert.equal(view.state().conversationTone, 'Gpt_62_Sol_Reasoning');
   assert.equal(view.state().observed.metering.GPT61SolQueryDaily, 40);
 });
 test('popup retains the chat model and reports a failed settings write', async () => {
   const store = createStore({ conversationTones: { [KEY]: { tone: 'Magic', at: 1 } } }); const view = popup(store, inChat); await settle();
   store.chrome.storage.local.set = async () => { throw new Error('No write'); };
-  await view.callbacks.onConversationSelect('Gpt_6_Reasoning'); await settle();
+  await view.callbacks.onConversationSelect('Gpt_62_Sol_Reasoning'); await settle();
   assert.equal(view.state().conversationTone, 'Magic'); assert.match(view.state().error, /Could not save/);
 });
 test('popup shows saved allowances outside Copilot and prefers the newer reading', async () => {

@@ -12,9 +12,8 @@ extension's card at chrome://extensions, then reload every Copilot tab.
 Every chat starts on GPT-6 Sol, the fixed default. Send a message, then open
 the toolbar popup and click another model to switch the chat you are viewing.
 That chat stays on the model you chose in every tab and across browser
-restarts; other chats are not affected. Alt+Shift+M opens the popup and the
-number keys 1-6 pick a model. Click GPT-6 Sol to return a chat to
-the default. Only a hash of the conversation ID is saved. No panel is
+restarts; other chats are not affected. Click GPT-6 Sol to return a chat
+to the default. Only a hash of the conversation ID is saved. No panel is
 displayed on Copilot.
 
 The popup's status line shows which model the last request was sent via. The

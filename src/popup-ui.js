@@ -5,6 +5,7 @@
   const core = globalThis.M365ExtenderCore;
   const STALE_MS = 5 * 60 * 1000;
   const COPILOT_URL = "https://copilot.cloud.microsoft/chat";
+  const REPO_URL = "https://github.com/fishux/M365-Copilot-Extender";
   const css = `
     :host { all: initial; color-scheme: light dark; --bg:#fbfaf6; --bar:#f1efe8; --line:#d8d5cc; --soft:#e2dfd6;
       --ink:#24292f; --muted:#57606a; --good:#1a7f37; --low:#9a6700; --critical:#cf222e; --accent:#0550ae;
@@ -15,7 +16,7 @@
     button:focus-visible, a:focus-visible, time:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; border-radius:4px; }
     .card { width:340px; background:var(--bg); }
     .header { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; background:var(--bar); border-bottom:1px solid var(--line); }
-    .brand { color:var(--accent); } .route { color:var(--muted); }
+    .brand { color:var(--accent); text-decoration:none; } .author { color:var(--muted); }
     .body { padding:10px 14px 12px; display:flex; flex-direction:column; gap:12px; }
     .status { display:flex; align-items:flex-start; gap:8px; margin:0; }
     .dot { width:7px; height:7px; margin-top:7px; border-radius:50%; background:var(--muted); flex:none; }
@@ -36,7 +37,7 @@
     .models.locked .model-row:hover { background:none; } .models.locked .model-row.active:hover { background:var(--current); }
     .model-row.no-work-iq .pick { opacity:.5; }
     .mark { width:14px; flex:none; color:var(--good); }
-    .badge { width:48px; flex:none; color:var(--accent); } .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .badge { width:56px; flex:none; color:var(--accent); } .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .tag { color:var(--muted); font-size:11px; } .tag.selected { color:var(--low); }
     .chip { height:24px; padding:0 8px; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer; font-size:11px; }
     .chip:hover { background:var(--hover); }
@@ -70,7 +71,7 @@
     card.className = "card";
     card.setAttribute("aria-label", "M365 Copilot Extender");
     // This template is static; server and saved values are set with textContent.
-    card.innerHTML = `<header class="header"><span class="brand">copilot-extender</span><span class="route"></span></header>
+    card.innerHTML = `<header class="header"><a class="brand" href="${REPO_URL}" target="_blank" rel="noopener">copilot extender</a><span class="author">fishux</span></header>
       <div class="body">
       <p class="status" role="status" aria-live="polite"><span class="dot"></span><span class="status-text">Waiting for Copilot</span><span class="wiq" title="Sent through Copilot's Work IQ agent, which can use your Teams, Outlook and SharePoint content" hidden>[work iq]</span></p>
       <p class="error" role="alert" hidden></p>
@@ -79,7 +80,7 @@
       <div class="line"><span class="key">weekly</span><span class="number weekly">—</span><span class="level weekly-level"></span></div></div>
       <p class="note pending" hidden>Send a message to check your allowance.</p></section>
       <p class="warning box" hidden></p>
-      <section aria-label="Models"><h2 class="heading"><span># model · this chat</span><span class="models-hint"></span></h2>
+      <section aria-label="Models">
       <div class="models" role="radiogroup" aria-label="Model for this chat"></div></section>
       <section class="conversation-info" aria-label="This conversation" hidden><h2 class="heading"># chat</h2>
       <div class="line"><span class="key">model</span><span class="chat-model"></span></div>
@@ -113,17 +114,6 @@
       find(".models").append(row);
       rows.push({ tone: model.tone, row, pick, mark, tag });
     }
-    // Keyboard: 1–6 picks that row's model; arrows move between rows.
-    card.addEventListener("keydown", event => {
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
-      const picks = rows.map(row => row.pick);
-      const digit = /^[1-9]$/.test(event.key) ? picks[Number(event.key) - 1] : undefined;
-      const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
-      if (digit && !digit.disabled) digit.click();
-      else if (step) picks[(Math.max(0, picks.indexOf(/** @type {any} */ (root.activeElement))) + step + picks.length) % picks.length].focus();
-      else return;
-      event.preventDefault();
-    });
     const toggle = find(".toggle");
     toggle.addEventListener("click", () => {
       const open = toggle.getAttribute("aria-expanded") !== "true";
@@ -146,7 +136,6 @@
       const selectable = !!(state.conversation || state.newChat);
       const locked = !state.loaded || state.saving || !selectable;
       find(".models").classList.toggle("locked", locked);
-      find(".models-hint").textContent = selectable ? `click or press 1–${rows.length}` : "open a chat to switch";
       for (const { tone: rowTone, row, pick, mark, tag } of rows) {
         const rowModel = core.modelFor(rowTone);
         const isDefault = rowTone === state.tone, isActive = rowTone === tone;
@@ -201,6 +190,8 @@
         status = "good";
       }
       if (observed.result === "OutOfCredits") { text = "The last request reached a usage limit."; status = "critical"; }
+      // Copilot refuses the GPT-6.x models to accounts without a Premium licence.
+      else if (observed.result === "ForbiddenRequest") { text = "Copilot refused this model for your licence. Try Auto."; status = "critical"; }
       else if (observed.result && observed.result !== "Success") { text = `Copilot response: ${observed.result}`; status = "warn"; }
       find(".status-text").textContent = text;
       // A quiet tag, like the model badges, when the last request went through Work IQ.
@@ -211,7 +202,6 @@
       find(".warning").textContent = observed.warning || "";
 
       const scenario = { OfficeWebPaidCopilot: "Paid Copilot", OfficeWebIncludedCopilot: "Included Copilot", officeweb: "Work IQ" }[observed.scenario || ""] || "";
-      find(".route").textContent = scenario ? (workIQ ? "work iq" : scenario.split(" ")[0].toLowerCase()) : "";
       find(".route-value").textContent = scenario || "Not observed";
       find(".work-iq").textContent = observed.workIQ === undefined ? "Not observed"
         : workIQ ? `On · ${sent?.workIQTone ?? "—"}` : "Off";

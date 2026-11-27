@@ -4,7 +4,9 @@ All notable changes to M365 Copilot Extender. Versions match `extension/manifest
 
 ## Unreleased
 
-- **Keyboard switching.** Alt+Shift+M opens the popup (change it at `chrome://extensions/shortcuts`), the number keys 1–6 pick a model, and the arrow keys move between rows.
+- **GPT-6.2 Sol.** Added `Gpt_62_Sol_Reasoning`, toolbar badge `6.2S`, with a usage counter from its `GPT62SolQuery*` budget.
+- **Shorter model list.** GPT-5.6, GPT-5.5 and GPT-6 Think deeper are no longer offered. A chat saved on one of them now uses the default, GPT-6 Sol. The list is GPT-6.2 Sol, GPT-6.1 Sol, GPT-6 Sol and Auto. GPT-6.2 Astra is left out for now: it is billed to Copilot credits.
+- **Consistent badges.** Version plus variant letter: `6.1` is now `6.1S`.
 - **Expiry warning.** A chat's server expiry is highlighted once less than a day remains.
 - Internal tidy-up with no behaviour change: the toolbar worker sets the badge through one function instead of three, and the popup and content script share one "keep the newest saved chats" helper.
 - **Runs on Copilot's new address.** Microsoft moved Copilot to `https://copilot.cloud.microsoft`. The content scripts, the popup's link to Copilot and the install notes now use it; the extension no longer loads on `m365.cloud.microsoft`. Reload Copilot after updating.

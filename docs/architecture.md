@@ -30,16 +30,14 @@ The conversation the page is showing is the URL's ID when present. With no ID in
 
 The parser reads `frame.item` for type `2` final results and each `frame.arguments` value for type `1`, target `update`. It extracts only valid nonnegative integer `remainingAllowance` values, known result/origin enums, and numeric conversation counts. Both final and streaming responses update only valid fields they actually report. Metering merges valid per-budget readings; empty, absent or invalid fields retain the last reading. Omission does not mean zero or unlimited.
 
-Only `GPT61SolQueryDaily` and `GPT61SolQueryWeekly` have direct evidence in the reviewed references for the six offered models. That model is marked as having a known paid-route cap. Other models with a prefix below recognize the exact `Daily`/`Weekly` suffixes **only if those keys are actually observed**. The evidence column is generated from `budgetEvidence` in `src/models.json`; the 25 October 2026 review behind it is in the [research notes](research.md#metering-keys-reviewed-25-october-2026).
+Only `GPT61SolQueryDaily` and `GPT61SolQueryWeekly` have direct evidence in the reviewed references for the four offered models. That model is marked as having a known paid-route cap. Other models with a prefix below recognize the exact `Daily`/`Weekly` suffixes **only if those keys are actually observed**. The evidence column is generated from `budgetEvidence` in `src/models.json`; the 25 October 2026 review behind it is in the [research notes](research.md#metering-keys-reviewed-25-october-2026).
 
 <!-- budgets:start (generated from src/models.json by npm run build) -->
 | Selected model | Budget prefix | Evidence |
 | --- | --- | --- |
+| GPT-6.2 Sol | `GPT62SolQuery` | Observed upstream (Nov 2026): GPT62SolQuery daily/weekly keys in paid-route metering and, on premium accounts, included-route metering; allowance sizes not yet documented |
 | GPT-6.1 Sol | `GPT61SolQuery` | Observed by upstream live probes: 40/day and 75/week on the paid route; included-route turns carry no metering |
 | GPT-6 Sol | `GPT6SolQuery` | Not observed: upstream paid-route metering maps contained no GPT-6 Sol key; prefix is a name-based guess, shown only if Copilot ever reports it |
-| GPT-6 | None | None: upstream found no priority-access allowance; limited only by the conversation cap and rate throttling |
-| GPT-5.6 | `GPT56Query` | Not observed: no GPT-5.6 key in upstream metering maps; name-based guess, shown only if Copilot ever reports it |
-| GPT-5.5 | `GPT55Query` | Not observed: upstream GPT-5.5 turns lowered no metered budget; name-based guess, shown only if Copilot ever reports it |
 | Auto | None | None: a budget cannot be attributed to Auto's unknown backend choice |
 <!-- budgets:end -->
 
@@ -55,8 +53,6 @@ Both worlds communicate via same-window, same-origin `postMessage` with an expli
 
 The content script sends the background worker `{ tone, remaining, workIQ }` for the tab: the model actually sent (conversation choice or default, after any Work IQ fallback), its lowest reported daily/weekly allowance, and whether the chat uses Work IQ. The worker sets a per-tab badge from `badge` in `models.json`, with `W` appended for Work IQ (`6SW`), and colours the badge and icon at 20 or fewer (orange) and 10 or fewer (red) remaining. The coloured icons are drawn at runtime with `OffscreenCanvas` from the same shapes as `icons/source.svg`. When a tab starts loading, the worker resets it to the default badge; the content script re-sends its state after navigation settles.
 
-The manifest's `_execute_action` command (suggested key Alt+Shift+M) opens the popup; it needs no permission. In the popup, number keys click the matching model row and the up/down arrows move focus between rows.
-
 No extension DOM or UI is injected into Copilot. The renderer is bundled only into the toolbar popup. Outside Copilot the popup cannot change a chat's model, because there is no conversation to save it against; it still shows the saved allowances. Tab metadata is available only when the tab's content script is reachable. The UI does not claim that `DeepLeo` identifies a precise model version.
 
 ## Current limits and live acceptance checks
@@ -65,6 +61,6 @@ The MVP covers the top-level Copilot page's JSON Chathub WebSockets on the obser
 
 The Node suite exercises actual protocol and controller scripts in isolated VM contexts with mocked transport/storage. The browser fixture exercises the actual UI, popup controller, page hook, and isolated controller with simulated APIs in regular web frames. Neither test installs the MV3 extension into the user's real Chrome profile. A fresh VM with shared saved settings is used for restart-style tests; no physical browser restart is claimed.
 
-Before declaring live support, load the unpacked extension on Windows Chrome, test all six selections in new and existing chats, and confirm that switching tabs and restarting Chrome preserves the selected model. Check that the observed applied tone matches outgoing DevTools frames and that usage values match sanitized type `2` final-item metering. Verify zero/absence handling and final-item refusal status. For per-conversation models, confirm in DevTools that the Chathub URL carries `ConversationId` for a new chat's first message and that it matches the later `/chat/conversation/<id>` URL; switch one chat to another model, then check that a second chat and a reopened first chat each send the expected tone. Check that the badge turns orange and red at the documented thresholds. Do not publish raw frames or account-bearing socket URLs. Live backend identity remains unresolved even when a request succeeds.
+Before declaring live support, load the unpacked extension on Windows Chrome, test all four selections in new and existing chats, and confirm that switching tabs and restarting Chrome preserves the selected model. Check that the observed applied tone matches outgoing DevTools frames and that usage values match sanitized type `2` final-item metering. Verify zero/absence handling and final-item refusal status. For per-conversation models, confirm in DevTools that the Chathub URL carries `ConversationId` for a new chat's first message and that it matches the later `/chat/conversation/<id>` URL; switch one chat to another model, then check that a second chat and a reopened first chat each send the expected tone. Check that the badge turns orange and red at the documented thresholds. Do not publish raw frames or account-bearing socket URLs. Live backend identity remains unresolved even when a request succeeds.
 
 References: [upstream research revisions](research.md), [Chrome content-script worlds and timing](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts), [storage persistence and events](https://developer.chrome.com/docs/extensions/reference/api/storage), and [tabs API permission boundaries](https://developer.chrome.com/docs/extensions/reference/api/tabs).
