@@ -42,7 +42,7 @@ test('tab badge colour and icon turn orange at 20 and red at 10 or below', async
   for (const [remaining, color, icon] of cases) {
     env.send({ type: 'M365_EXTENDER_TAB', tone: 'Gpt_61_Sol_Reasoning', remaining }); await settle();
     assert.equal(env.last('setBadgeBackgroundColor', 5).color, color, `remaining ${remaining}`);
-    assert.equal(env.last('setBadgeText', 5).text, '6.1');
+    assert.equal(env.last('setBadgeText', 5).text, '6.1S');
     const setIcon = env.last('setIcon', 5);
     if (icon === 'path') assert.deepEqual(setIcon.path, { 16: 'icons/icon16.png', 32: 'icons/icon32.png' });
     else assert.deepEqual(setIcon.imageData[16].fills[0], icon === 'warn' ? ['#f7a94f', '#d9690f'] : ['#f2665c', '#c5221f']);
@@ -52,7 +52,7 @@ test('tab badge colour and icon turn orange at 20 and red at 10 or below', async
 
 test('tab badge resets when the tab navigates and ignores foreign or malformed messages', async () => {
   const env = worker(); await settle();
-  env.send({ type: 'M365_EXTENDER_TAB', tone: 'Gpt_6_Reasoning', remaining: 3 }); await settle();
+  env.send({ type: 'M365_EXTENDER_TAB', tone: 'Gpt_62_Sol_Reasoning', remaining: 3 }); await settle();
   env.listeners.updated(5, { status: 'loading' }); await settle();
   assert.equal(env.last('setBadgeText', 5).text, null);
   assert.deepEqual(env.last('setIcon', 5).path, { 16: 'icons/icon16.png', 32: 'icons/icon32.png' });

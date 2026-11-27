@@ -21,11 +21,9 @@ When updating, replace the extension files in the same folder, click **Reload** 
 <!-- models:start (generated from src/models.json by npm run build) -->
 | Selection | Badge | Requested tone | Work IQ tone |
 | --- | --- | --- | --- |
-| GPT-6.1 Sol | `6.1` | `Gpt_61_Sol_Reasoning` | None: uses GPT-6 Sol |
+| GPT-6.2 Sol | `6.2S` | `Gpt_62_Sol_Reasoning` | None: uses GPT-6 Sol |
+| GPT-6.1 Sol | `6.1S` | `Gpt_61_Sol_Reasoning` | None: uses GPT-6 Sol |
 | GPT-6 Sol (default) | `6S` | `Gpt_6_Sol_Reasoning` | `Gpt_6_Sol_Chat` |
-| GPT-6 · Think deeper | `6` | `Gpt_6_Reasoning` | None: uses GPT-6 Sol |
-| GPT-5.6 · Think deeper | `5.6` | `Gpt_5_6_Reasoning` | None: uses GPT-6 Sol |
-| GPT-5.5 · Think deeper | `5.5` | `Gpt_5_5_Reasoning` | None: uses GPT-6 Sol |
 | Auto | `A` | `Magic` | `Magic` |
 <!-- models:end -->
 
@@ -35,7 +33,7 @@ Model matching ignores case: Copilot's web client sends `Magic` for Auto, other 
 
 Work IQ is Copilot's switch for grounding answers in Teams, Outlook, SharePoint and other work data. Turn it on or off in Copilot's page as usual; the extension follows it and has no switch of its own.
 
-**Supported with Work IQ: GPT-6 Sol only** (plus Auto, which is Copilot's own default). This is deliberate scope, not a pending gap: other models are not planned for Work IQ.
+**Supported with Work IQ: GPT-6 Sol only** (plus Auto, which is Copilot's own default). Other models are sent as GPT-6 Sol in Work IQ chats for now; an in-extension Work IQ toggle is planned.
 
 - A Work IQ chat attaches Copilot's built-in `bizchat-as-gpt-scenario` agent. That agent ignores the `*_Reasoning` tones the extension normally sends and falls back to a GPT-5 model, which is why Work IQ used to drop chats to GPT-5.
 - In a Work IQ chat the extension sends the model's **Work IQ tone** from the table above: `Gpt_6_Sol_Chat` for GPT-6 Sol, the value Copilot's own picker sends.
@@ -56,9 +54,9 @@ Microsoft controls final model routing. An applied tone and response `contentOri
 
 Counters show **remaining messages** reported by Copilot, refreshed after a response. They do not estimate usage or assume that the reported 40/day and 75/week apply to every account.
 
-- GPT-6.1 Sol uses the documented `throttling.metering.GPT61SolQueryDaily.remainingAllowance` and `GPT61SolQueryWeekly.remainingAllowance` fields. The parser reads both final type `2` items and type `1` update records.
+- GPT-6.1 Sol uses the documented `throttling.metering.GPT61SolQueryDaily.remainingAllowance` and `GPT61SolQueryWeekly.remainingAllowance` fields. GPT-6.2 Sol reads the `GPT62SolQuery*` keys the same way; upstream has seen those keys but not yet their allowance sizes. The parser reads both final type `2` items and type `1` update records.
 - Other selectable models have no hardcoded quota. If Copilot supplies directly matching model-specific daily/weekly keys, the UI can display them; the mappings and their evidence limits are described in [architecture notes](docs/architecture.md).
-- Models without a documented or observed budget have no usage box. GPT-6.1 Sol shows a waiting state before its first paid-route reading. Missing data is unknown, never zero or unlimited. Included-route GPT-6.1 Sol has no counter unless an allowance is actually reported.
+- Models without a documented or observed budget have no usage box. GPT-6.2 Sol and GPT-6.1 Sol show a waiting state before their first reading. Missing data is unknown, never zero or unlimited. Included-route GPT-6.1 Sol has no counter unless an allowance is actually reported.
 - Zero remains visible. `OutOfCredits` is surfaced even if the refusal appears only in the final result. There is no guessed reset countdown or automatic fallback.
 - Allowances are per account, so they stay visible when you switch to another conversation in the same tab.
 - The last reported allowances are **saved in `chrome.storage.local`** and shared by every tab in this Chrome profile. Each new reply that reports an allowance updates the values it reports; others keep their last value. Allowances also show when the popup is opened outside Copilot. If you use two Microsoft accounts in one Chrome profile, the most recent reply's allowances are shown. Old readings are marked **Last known** after five minutes; they refresh only with a new response.
@@ -70,7 +68,7 @@ The status line at the top of the popup names the model the last request was sen
 The toolbar popup includes a compact chat section below the model list:
 
 - **Capacity:** the server's used/maximum message counts and a slim meter. It highlights at 90% capacity. The maximum is read from Copilot, never assumed to be 600, and is separate from model allowances. Hover the count for remaining conversation messages.
-- **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
+- **Server expiry:** a short local date and time remaining, read from `item.conversationExpiryTime`. It is highlighted once less than a day remains. Hover or keyboard-focus the date for its exact local timestamp. A passed timestamp is labelled **Passed**; it is not a claim that the chat has been deleted. The server timestamp does not establish Microsoft's retention policy.
 
 These readings belong to the conversation shown in the page. Each conversation keeps its own last observed reply in this tab, so switching chats in the sidebar shows that chat's readings, and a new, unsent chat shows none. Each chat's last readings (the model the last request was sent via, result, origin, capacity and expiry) are saved under a hash of its conversation ID, so reopening the chat in another tab or after a restart shows them without a new message. They are not a live query: a conversation that has never replied with the extension installed shows **Awaiting reply** for capacity and **Not reported** for expiry. The last valid values remain visible until Copilot reports replacements, including across partial or final replies that omit fields. Opening a background socket does not clear them, and replies on a connection where nothing was sent are ignored. Readings for connections without a conversation ID stay in that tab only. Countdown labels refresh locally without Microsoft requests.
 
@@ -112,7 +110,7 @@ For the last command, open `http://127.0.0.1:8765/tests/preview/index.html` and 
 
 GitHub Actions runs `npm run check`, `npm test` and `npm run typecheck` on Node 20, 22 and 24 for every pull request and push to `main` ([workflow](.github/workflows/ci.yml)). The browser preview checks are still run by hand.
 
-Automated coverage includes multi-record framing, all six models, tone casing, native socket behavior, settings-load races, cross-tab propagation of chat choices, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. Persistence tests cover allowances shared across tabs and per-chat readings restored in a new tab. The browser fixture checks the model rows, the GPT-6 Sol default, switching a chat's model, the status line, usage states and colours, saved allowances and readings, and absence of injected page controls.
+Automated coverage includes multi-record framing, all four models, tone casing, native socket behavior, settings-load races, cross-tab propagation of chat choices, restart-style reloads, absent/zero quotas, final-item refusals, stale socket isolation, per-conversation models and readings, hashed conversation storage, badge thresholds, and metadata privacy. Persistence tests cover allowances shared across tabs and per-chat readings restored in a new tab. The browser fixture checks the model rows, the GPT-6 Sol default, switching a chat's model, the status line, usage states and colours, saved allowances and readings, and absence of injected page controls.
 
 **Live account validation remains required.** These checks establish extension behavior against fixtures; they do not establish current Microsoft availability, backend identity, or account-specific quota policies. No Microsoft account credentials are needed for the test suite.
 

@@ -19,12 +19,10 @@
     onConversationSelect: tone => saveConversation(tone)
   });
   const render = () => panel.update(state);
-  async function save(patch) {
+  /** Run one change with the rows locked, showing `failure` if it throws. */
+  async function change(action, failure) {
     state.saving = true; state.error = ""; render();
-    try {
-      await chrome.storage.local.set(patch);
-      applySettings(patch);
-    } catch { state.error = "Could not save changes. Please try again."; }
+    try { await action(); } catch { state.error = failure; }
     finally { state.saving = false; render(); }
   }
   /**
@@ -39,19 +37,17 @@
     const next = { ...conversationTones };
     if (model && model.tone !== core.DEFAULT_TONE) next[key] = { tone: model.tone, at: Date.now() };
     else delete next[key];
-    const recent = Object.entries(next).sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, core.MAX_SAVED_CONVERSATIONS);
-    return save({ conversationTones: Object.fromEntries(recent) });
+    const patch = { conversationTones: core.newest(next) };
+    return change(async () => { await chrome.storage.local.set(patch); applySettings(patch); }, "Could not save changes. Please try again.");
   }
-  /** @param {string | null} tone */
-  async function chooseForNewChat(tone) {
-    state.saving = true; state.error = ""; render();
-    try {
+  /** A new chat has no conversation yet; its tab holds the choice until the first message. @param {string | null} tone */
+  function chooseForNewChat(tone) {
+    return change(async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const reply = await chrome.tabs.sendMessage(/** @type {number} */ (tab.id), { type: "M365_EXTENDER_NEW_CHAT_TONE", tone });
       if (!reply?.ok) throw new Error("rejected");
       await readTab();
-    } catch { state.error = "Could not change the model. Reload Copilot and try again."; }
-    finally { state.saving = false; render(); }
+    }, "Could not change the model. Reload Copilot and try again.");
   }
   function refreshConversation() {
     const key = state.conversation?.key;

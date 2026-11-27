@@ -32,6 +32,10 @@
     return remaining <= ALLOWANCE_LEVELS.warn ? "warn" : "normal";
   }
 
+  /** Keep only the newest entries of a saved per-conversation map. */
+  const newest = entries => Object.fromEntries(Object.entries(entries)
+    .sort(([, a], [, b]) => (b?.at || 0) - (a?.at || 0)).slice(0, MAX_SAVED_CONVERSATIONS));
+
   /** Conversation shown in a Copilot page path, e.g. /chat/conversation/<id>. */
   function conversationFromPath(pathname) {
     const match = /\/chat\/conversation\/([^/?#]+)/i.exec(typeof pathname === "string" ? pathname : "");
@@ -58,6 +62,7 @@
     const used = count(conversation?.used), limit = count(conversation?.limit);
     const known = used !== null && limit !== null;
     const expiry = parseExpiry(expiresAt);
+    const timeLeft = expiry ? Date.parse(expiry) - now : null;
     const shortDate = expiry ? new Date(expiry).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
     return {
       capacity: known ? `${used} / ${limit} messages` : "Awaiting reply",
@@ -66,7 +71,9 @@
       percent: known && limit > 0 ? Math.min(100, used / limit * 100) : null,
       nearLimit: known && (limit === 0 || used / limit >= 0.9),
       expiry,
-      expiryText: expiry ? `${shortDate} · ${timeRemaining(Date.parse(expiry) - now)}` : "Not reported",
+      // Under a day left (or already passed): worth saving anything needed from the chat.
+      expiresSoon: timeLeft !== null && timeLeft < 86_400_000,
+      expiryText: timeLeft !== null ? `${shortDate} · ${timeRemaining(timeLeft)}` : "Not reported",
       expiryTitle: expiry ? `${new Date(expiry).toLocaleString()} — server-reported conversation expiry; not a guaranteed data deletion date.` : "Copilot has not reported a conversation expiry time."
     };
   }
@@ -210,7 +217,7 @@
     });
   }
 
-  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, MAX_SAVED_CONVERSATIONS, modelFor, connectionInfo, safeScenario,
+  globalThis.M365ExtenderCore = Object.freeze({ MODELS, DEFAULT_TONE, newest, modelFor, connectionInfo, safeScenario,
     safeConversationId, conversationFromPath, ALLOWANCE_LEVELS, allowanceLevel, lowestAllowance,
     isChat, usesWorkIQ, requestFor, parseRecords, rewrite, parseMetering, allowanceFor, readMetadata, count, parseExpiry, conversationView,
     allowedOrigins: Object.freeze(allowedOrigins), allowedResults: Object.freeze([...allowedResults, "Other"]) });

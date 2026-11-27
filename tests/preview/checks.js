@@ -14,19 +14,19 @@ document.getElementById('checks').addEventListener('click', async () => {
     await pause(1600);
     check(!copilot.document.querySelector('m365-copilot-extender'), 'No extension UI injected into Copilot');
     check(!popupRoot.querySelector('input, select, .collapse, .settings, .pin, .copy, .copy-all, .out-of-credits'), 'No dropdowns, pins, copy or out-of-credits controls');
-    check(popupRoot.querySelectorAll('.model-row').length === 6, 'Six models always visible');
+    check(popupRoot.querySelectorAll('.model-row').length === 4, 'Four models always visible');
     check(!popupRoot.querySelector('.models').classList.contains('locked') && row('Gpt_6_Sol_Reasoning').classList.contains('active'), 'A new chat starts on the default and can be switched before its first message');
     copilot.simulateReply(); await pause(1600);
     check(wire().includes('Gpt_6_Sol_Reasoning'), 'First message uses the GPT-6 Sol default');
     check(status() === 'Last request sent via GPT-6 Sol', 'Success status names the model');
     check(!popupRoot.querySelector('.models').classList.contains('locked'), 'Models can be switched once the chat exists');
-    choose('Gpt_6_Reasoning'); await pause(1600);
-    check(Object.values(fixtureStore.data.conversationTones || {}).some(entry => entry.tone === 'Gpt_6_Reasoning'), 'Chat model is saved under a hashed key');
-    check(row('Gpt_6_Reasoning').classList.contains('active') && status().endsWith('next: GPT-6'), 'Status shows the next model after switching');
+    choose('Gpt_62_Sol_Reasoning'); await pause(1600);
+    check(Object.values(fixtureStore.data.conversationTones || {}).some(entry => entry.tone === 'Gpt_62_Sol_Reasoning'), 'Chat model is saved under a hashed key');
+    check(row('Gpt_62_Sol_Reasoning').classList.contains('active') && status().endsWith('next: GPT-6.2 Sol'), 'Status shows the next model after switching');
     copilot.simulateReply(32, 58); await pause(1600);
-    check(wire().includes('Gpt_6_Reasoning'), 'The chat keeps its chosen model');
-    check(fixtureToolbar.tone === 'Gpt_6_Reasoning', 'Toolbar reports the chat model');
-    check(status() === 'Last request sent via GPT-6', 'Status follows the routed model');
+    check(wire().includes('Gpt_62_Sol_Reasoning'), 'The chat keeps its chosen model');
+    check(fixtureToolbar.tone === 'Gpt_62_Sol_Reasoning', 'Toolbar reports the chat model');
+    check(status() === 'Last request sent via GPT-6.2 Sol', 'Status follows the routed model');
     choose('Gpt_61_Sol_Reasoning'); await pause(1600);
     copilot.simulateReply(0, 0); await pause(1600);
     check(popupRoot.querySelector('.daily').textContent === '0', 'Zero quota stays visible');
@@ -56,6 +56,10 @@ document.getElementById('checks').addEventListener('click', async () => {
     check(wire().includes('Gpt_6_Sol_Reasoning'), 'The chat uses the default again');
     check(popupRoot.querySelector('.expiry-value').getAttribute('datetime') !== null, 'Popup receives server expiry');
     check(popupRoot.querySelector('.expiry-value').title.includes('not a guaranteed data deletion date'), 'Exact expiry explains its meaning');
+    for (const key of ['2', 'ArrowDown']) popupRoot.querySelector('.card').dispatchEvent(new popup.KeyboardEvent('keydown', { key, bubbles: true }));
+    await pause(400);
+    check(!row('Gpt_61_Sol_Reasoning').classList.contains('active') && !popupRoot.querySelector('.work'), 'No keyboard shortcuts or work toggles');
+    choose('Gpt_6_Sol_Reasoning'); await pause(1600);
     result.textContent = passed.length + ' UI checks passed · simulated transport'; result.dataset.status = 'passed';
   } catch (error) { result.textContent = 'FAILED: ' + error.message; result.dataset.status = 'failed'; }
 });

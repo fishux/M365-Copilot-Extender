@@ -14,14 +14,14 @@ const reply = (socket, item) => socket.receive(JSON.stringify({ type: 2, item })
 const flush = async () => { for (let i = 0; i < 3; i++) { await settle(); await new Promise(resolve => setTimeout(resolve, 5)); } await settle(); };
 
 test('a saved per-conversation model applies only to that conversation', async () => {
-  const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_6_Reasoning', at: 1 } } });
+  const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_62_Sol_Reasoning', at: 1 } } });
   const env = environment(store); env.addContent(); await flush();
   const a = new env.main.WebSocket(at(A)), b = new env.main.WebSocket(at(B));
   a.send(chat()); b.send(chat());
   // Held until the conversation lookup answers, then sent in order.
   assert.equal(a.sent.length, 0);
   await flush();
-  assert.equal(toneSent(a), 'Gpt_6_Reasoning');
+  assert.equal(toneSent(a), 'Gpt_62_Sol_Reasoning');
   assert.equal(toneSent(b), 'Gpt_6_Sol_Reasoning');
 });
 
@@ -30,14 +30,14 @@ test('changing a conversation model in another tab applies to the next turn', as
   const env = environment(store); env.addContent(); await flush();
   const socket = new env.main.WebSocket(at(A)); await flush();
   socket.send(chat()); assert.equal(toneSent(socket), 'Gpt_6_Sol_Reasoning');
-  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_5_6_Reasoning', at: 2 } } }); await flush();
-  socket.send(chat()); assert.equal(toneSent(socket, 1), 'Gpt_5_6_Reasoning');
+  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_62_Sol_Reasoning', at: 2 } } }); await flush();
+  socket.send(chat()); assert.equal(toneSent(socket, 1), 'Gpt_62_Sol_Reasoning');
   await store.chrome.storage.local.set({ conversationTones: {} }); await flush();
   socket.send(chat()); assert.equal(toneSent(socket, 2), 'Gpt_6_Sol_Reasoning');
 });
 
 test('raw conversation IDs never reach storage or the popup snapshot', async () => {
-  const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_6_Reasoning', at: 1 } } });
+  const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_62_Sol_Reasoning', at: 1 } } });
   const env = environment(store, { pathname: `/chat/conversation/${A}` });
   const content = env.addContent(); await flush();
   const socket = new env.main.WebSocket(at(A)); socket.send(chat()); await flush();
@@ -115,14 +115,14 @@ test('Auto matches either casing and leaves an equivalent frame untouched', asyn
   const context = vm.createContext({ URL }); load(context, 'core.js');
   const core = context.M365ExtenderCore;
   assert.equal(core.modelFor('MAGIC').tone, 'Magic');
-  assert.equal(core.modelFor('gpt_6_reasoning').tone, 'Gpt_6_Reasoning');
+  assert.equal(core.modelFor('gpt_62_sol_reasoning').tone, 'Gpt_62_Sol_Reasoning');
   const lower = chat('magic');
   assert.equal(core.rewrite(lower, 'Magic').data, lower);
   assert.deepEqual(clone(core.rewrite(lower, 'Magic').tones), ['Magic']);
   // A saved lowercase choice is sent in Copilot's own casing.
   const store = createStore({ conversationTones: { [keyOf(A)]: { tone: 'magic', at: 1 } } });
   const env = environment(store); env.addContent(); await flush();
-  const socket = new env.main.WebSocket(at(A)); socket.send(chat('Gpt_6_Reasoning')); await flush();
+  const socket = new env.main.WebSocket(at(A)); socket.send(chat('Gpt_62_Sol_Reasoning')); await flush();
   assert.equal(toneSent(socket), 'Magic');
 });
 
@@ -153,9 +153,9 @@ test('popup keeps a chosen model for the chat under its hashed key; choosing the
   const view = popup(store, { hookReady: true, observed: {}, conversation: { key } }); await settle();
   assert.equal(view.state().conversationTone, null);
   assert.equal(view.state().tone, 'Gpt_6_Sol_Reasoning');
-  await view.callbacks.onConversationSelect('Gpt_6_Reasoning'); await settle();
-  assert.equal(store.data.conversationTones[key].tone, 'Gpt_6_Reasoning');
-  assert.equal(view.state().conversationTone, 'Gpt_6_Reasoning');
+  await view.callbacks.onConversationSelect('Gpt_62_Sol_Reasoning'); await settle();
+  assert.equal(store.data.conversationTones[key].tone, 'Gpt_62_Sol_Reasoning');
+  assert.equal(view.state().conversationTone, 'Gpt_62_Sol_Reasoning');
   assert.equal(store.data.selectedTone, undefined);
   await view.callbacks.onConversationSelect('Gpt_6_Sol_Reasoning'); await settle();
   assert.deepEqual(clone(store.data.conversationTones), {});
@@ -166,16 +166,16 @@ test('popup keeps only the 2000 most recent conversation choices', async () => {
   const old = Object.fromEntries(Array.from({ length: 2005 }, (_, i) => [i.toString(16).padStart(32, '0'), { tone: 'Magic', at: i }]));
   const store = createStore({ conversationTones: old });
   const view = popup(store, { hookReady: true, observed: {}, conversation: { key: keyOf(B) } }); await settle();
-  await view.callbacks.onConversationSelect('Gpt_5_5_Reasoning'); await settle();
+  await view.callbacks.onConversationSelect('Gpt_61_Sol_Reasoning'); await settle();
   const saved = store.data.conversationTones;
   assert.equal(Object.keys(saved).length, 2000);
-  assert.equal(saved[keyOf(B)].tone, 'Gpt_5_5_Reasoning');
+  assert.equal(saved[keyOf(B)].tone, 'Gpt_61_Sol_Reasoning');
   assert.equal(saved[(0).toString(16).padStart(32, '0')], undefined);
 });
 
 test('popup cannot set a conversation model outside a known conversation', async () => {
   const store = createStore();
   const view = popup(store, { hookReady: true, observed: {}, conversation: null }); await settle();
-  await view.callbacks.onConversationSelect('Gpt_6_Reasoning'); await settle();
+  await view.callbacks.onConversationSelect('Gpt_62_Sol_Reasoning'); await settle();
   assert.equal(store.data.conversationTones, undefined);
 });

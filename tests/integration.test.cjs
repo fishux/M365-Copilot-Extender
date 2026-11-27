@@ -59,11 +59,11 @@ test('a chat selection propagates to two tabs and survives a new context without
   const store = createStore({ inPageEnabled: true }); // Legacy preference is ignored.
   const a = environment(store), b = environment(store);
   a.addContent(); b.addContent(); await flush();
-  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_6_Reasoning', at: 1 } } }); await flush();
+  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_62_Sol_Reasoning', at: 1 } } }); await flush();
   const restarted = environment(store); restarted.addContent(); await flush();
   for (const env of [a, b, restarted]) {
     const socket = new env.main.WebSocket(at(A)); socket.send(chat()); await flush();
-    assert.equal(toneSent(socket), 'Gpt_6_Reasoning');
+    assert.equal(toneSent(socket), 'Gpt_62_Sol_Reasoning');
     // Other chats stay on the default.
     const other = new env.main.WebSocket(endpoint); other.send(chat());
     assert.equal(toneSent(other), 'Gpt_6_Sol_Reasoning');
@@ -92,10 +92,10 @@ test('cross-tab changes arriving during startup are not overwritten by a stale i
   const store = createStore(); let resolve;
   store.chrome.storage.local.get = () => new Promise(r => { resolve = r; });
   const env = environment(store); env.addContent();
-  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_5_5_Reasoning', at: 2 } } });
+  await store.chrome.storage.local.set({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_61_Sol_Reasoning', at: 2 } } });
   resolve({ conversationTones: { [keyOf(A)]: { tone: 'Magic', at: 1 } } }); await flush();
   const socket = new env.main.WebSocket(at(A)); socket.send(chat()); await flush();
-  assert.equal(toneSent(socket), 'Gpt_5_5_Reasoning');
+  assert.equal(toneSent(socket), 'Gpt_61_Sol_Reasoning');
 });
 test('conversation capacity and expiry flow through the hook without persisting per-chat data', async () => {
   const env = environment(); env.addContent(); await settle();
@@ -185,4 +185,10 @@ test('a chat keeps its last readings across tabs and restarts, keyed by a hash',
   // A new, unsent chat shows none of it.
   later.location.pathname = '/chat';
   assert.equal(content.snapshot().observed.conversation, undefined);
+});
+test('a chat saved on a retired GPT-5 model falls back to the default', async () => {
+  const env = environment(createStore({ conversationTones: { [keyOf(A)]: { tone: 'Gpt_5_5_Reasoning', at: 2 } } }));
+  env.addContent(); await flush();
+  const socket = new env.main.WebSocket(at(A)); socket.send(chat()); await flush();
+  assert.equal(toneSent(socket), 'Gpt_6_Sol_Reasoning');
 });

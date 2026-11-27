@@ -89,12 +89,12 @@ test('a model chosen on a new chat before its first message is applied and saved
   assert.deepEqual(content.snapshot().newChat, { tone: null });
   const id = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
   const socket = new env.main.WebSocket(`${endpoint}&ConversationId=${id}`); await flush(); // Copilot opens the socket before the first send.
-  assert.deepEqual(content.send({ type: 'M365_EXTENDER_NEW_CHAT_TONE', tone: 'Gpt_6_Reasoning' }), { ok: true });
-  assert.deepEqual(content.snapshot().newChat, { tone: 'Gpt_6_Reasoning' });
+  assert.deepEqual(content.send({ type: 'M365_EXTENDER_NEW_CHAT_TONE', tone: 'Gpt_62_Sol_Reasoning' }), { ok: true });
+  assert.deepEqual(content.snapshot().newChat, { tone: 'Gpt_62_Sol_Reasoning' });
   await flush();
   socket.send(chat()); await flush();
-  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_6_Reasoning');
-  assert.equal(Object.values(env.store.data.conversationTones || {})[0]?.tone, 'Gpt_6_Reasoning');
+  assert.equal(JSON.parse(socket.sent[0].slice(0, -1)).arguments[0].tone, 'Gpt_62_Sol_Reasoning');
+  assert.equal(Object.values(env.store.data.conversationTones || {})[0]?.tone, 'Gpt_62_Sol_Reasoning');
   assert.equal(content.snapshot().newChat, null);
   // Once the chat exists the choice belongs to it; the new-chat path is closed.
   env.location.pathname = '/chat/conversation/' + id;
